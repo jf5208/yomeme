@@ -9,8 +9,8 @@ requires = ["python-3.11"]
 preview_enable = "enabled"
 
 [dev]
-build = ["bash", "-c", "cd /workspace/projects/coze-import-pet-meme-20260903 && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"]
-run = ["bash", "-c", "cd /workspace/projects/coze-import-pet-meme-20260903 && .venv/bin/python run.py"]
+build = ["bash", "scripts/build.sh"]
+run = ["bash", "scripts/run.sh"]
 
 [deploy]
 build = ["bash", "scripts/setup.sh"]
