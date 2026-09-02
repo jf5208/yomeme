@@ -1,0 +1,21 @@
+[project]
+sub_id = "29b6feda"
+name = "pet-meme-generator"
+project_type = "web"
+version = "0.0.35"
+entrypoint = "coze-import-pet-meme-20260903/run.py"
+requires = ["python-3.11"]
+
+[preview]
+preview_enable = "enabled"
+
+[deploy]
+build = ["bash", "coze-import-pet-meme-20260903/scripts/setup.sh"]
+run = ["bash", "coze-import-pet-meme-20260903/scripts/http_run.sh", "-p", "5000"]
+
+[deploy.profile]
+kind = "service"
+flavor = "web"
+
+[subprojects]
+path = ["coze-import-pet-meme-20260903"]
