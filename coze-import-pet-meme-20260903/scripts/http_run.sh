@@ -29,4 +29,5 @@ while getopts "p:h" opt; do
 done
 
 export PORT
+export STATE_DIR="${STATE_DIR:-/tmp/pet-meme-state}"
 python run.py

@@ -29,8 +29,15 @@ def create_app(
     generator_factories: dict[str, Callable[[str], object]] | None = None,
 ) -> Flask:
     app = Flask(__name__, static_folder="../static", static_url_path="")
-    root = Path(__file__).resolve().parents[1]
-    state_root = state_dir or root / ".state"
+    if state_dir is not None:
+        state_root = state_dir
+    else:
+        env_state = os.environ.get("STATE_DIR", "").strip()
+        if env_state:
+            state_root = Path(env_state)
+        else:
+            root = Path(__file__).resolve().parents[1]
+            state_root = root / ".state"
     upload_dir = state_root / "uploads"
     output_dir = state_root / "outputs"
     upload_dir.mkdir(parents=True, exist_ok=True)

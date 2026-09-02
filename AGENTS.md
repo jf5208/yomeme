@@ -64,3 +64,4 @@
 - **积分规则**: Seedream 消耗 1 积分，Gemini 消耗 3 积分
 - **水印处理**: 生成前会自动尝试去除模板角落的平台水印
 - **状态记录**: 每次请求记录到 .state/generations.jsonl
+- **部署环境状态目录**: FaaS 部署环境文件系统只读，状态目录（uploads、outputs、数据库）默认使用 `/tmp/pet-meme-state`，可通过环境变量 `STATE_DIR` 自定义
