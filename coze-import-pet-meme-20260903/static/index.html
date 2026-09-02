@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>宠物 Meme 生成器</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace">
+        <div class="controls">
+          <header>
+            <p class="eyebrow">MVP</p>
+            <h1>宠物 Meme 生成器</h1>
+          </header>
+
+          <form id="generate-form">
+            <input type="hidden" name="access_method" value="invite" />
+
+            <div id="invite-fields" class="credential-fields">
+              <label class="credential-label" for="invite-code">邀请码</label>
+              <div class="credential-row">
+                <input id="invite-code" name="invite_code" type="text" autocomplete="off" />
+                <button id="verify-invite" type="button">验证</button>
+              </div>
+              <p id="invite-status" class="inline-status" role="status">验证后显示分配模型和剩余积分。</p>
+            </div>
+
+            <input id="template-width" name="template_width" type="hidden" />
+            <input id="template-height" name="template_height" type="hidden" />
+
+            <label class="upload-box">
+              <span>单动物 Meme 模板</span>
+              <input id="template" name="template" type="file" accept="image/png,image/jpeg,image/webp" required />
+              <small>请上传正方形图片（宽高比例 1:1）</small>
+            </label>
+
+            <label class="upload-box">
+              <span>自家宠物照片 1-3 张</span>
+              <input id="pets" name="pets" type="file" accept="image/png,image/jpeg,image/webp" multiple required />
+            </label>
+
+            <label class="textarea-label">
+              调整意见
+              <textarea id="adjustment" name="adjustment" rows="4" placeholder="第一次可以留空；看到结果后再写，例如：眼神更像原图、毛色更像第二张宠物照。"></textarea>
+            </label>
+
+            <label class="consent-row">
+              <input id="rights-confirmed" name="rights_confirmed" value="1" type="checkbox" required />
+              <span>我已知晓：请仅上传自己创作或已获授权的图片。若图片含有平台水印，我确认自己有权进行处理。</span>
+            </label>
+            <input type="hidden" name="remove_watermark" value="1" />
+
+            <button id="submit-button" type="submit">生成 Meme</button>
+          </form>
+
+          <p id="status" class="status" role="status"></p>
+        </div>
+
+        <div class="preview-area">
+          <section class="preview-panel">
+            <div class="panel-header">
+              <h2>模板预览</h2>
+              <span id="template-ratio" class="template-ratio">等待模板</span>
+            </div>
+            <div class="image-stage">
+              <img id="template-preview" alt="模板预览" />
+              <span id="template-placeholder">上传 Meme 模板后显示</span>
+            </div>
+          </section>
+
+          <section class="preview-panel">
+            <div class="panel-header">
+              <h2>生成结果</h2>
+              <a id="download-link" class="download-link" href="#" download hidden>下载</a>
+            </div>
+            <div class="image-stage">
+              <img id="result-preview" alt="生成结果" />
+              <span id="result-placeholder">生成完成后显示</span>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

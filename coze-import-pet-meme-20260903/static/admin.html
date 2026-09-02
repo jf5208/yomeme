@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>邀请码管理</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell admin-shell">
+      <section class="admin-panel">
+        <header>
+          <p class="eyebrow">OWNER</p>
+          <h1>邀请码管理</h1>
+        </header>
+
+        <form id="admin-form" class="admin-form">
+          <label class="credential-label" for="admin-password">管理密码</label>
+          <input id="admin-password" type="password" autocomplete="off" />
+
+          <div class="admin-grid">
+            <label class="credential-label" for="invite-provider">
+              模型
+              <select id="invite-provider">
+                <option value="seedream">Seedream</option>
+                <option value="gemini">Gemini</option>
+              </select>
+            </label>
+
+            <label class="credential-label" for="invite-uses">
+              积分
+              <input id="invite-uses" type="number" min="1" step="1" value="10" />
+            </label>
+          </div>
+
+          <button id="create-invite" type="submit">生成邀请码</button>
+        </form>
+
+        <section class="created-code-area" aria-label="新邀请码">
+          <div>
+            <p class="section-label">新邀请码</p>
+            <p id="created-code" class="created-code"></p>
+          </div>
+          <button id="copy-created-code" type="button" disabled>复制</button>
+        </section>
+
+        <section class="invite-section">
+          <div class="panel-header admin-list-header">
+            <h2>已有邀请码</h2>
+            <button id="refresh-invites" type="button">刷新</button>
+          </div>
+          <div id="invite-list" class="invite-list"></div>
+        </section>
+
+        <p id="admin-status" class="status" role="status"></p>
+      </section>
+    </main>
+    <script src="/admin.js"></script>
+  </body>
+</html>
