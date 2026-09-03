@@ -2,6 +2,7 @@ const adminForm = document.querySelector("#admin-form");
 const adminPassword = document.querySelector("#admin-password");
 const inviteProvider = document.querySelector("#invite-provider");
 const inviteUses = document.querySelector("#invite-uses");
+const inviteCount = document.querySelector("#invite-count");
 const createInvite = document.querySelector("#create-invite");
 const createdCode = document.querySelector("#created-code");
 const copyCreatedCode = document.querySelector("#copy-created-code");
@@ -13,6 +14,8 @@ const providerNames = {
   gemini: "Gemini",
   seedream: "Seedream",
 };
+
+let lastCreatedCodes = [];
 
 function adminHeaders() {
   return {
@@ -115,21 +118,35 @@ adminForm.addEventListener("submit", async (event) => {
   createdCode.textContent = "";
   copyCreatedCode.disabled = true;
   copyCreatedCode.textContent = "复制";
-  adminStatus.textContent = "正在生成邀请码...";
+  lastCreatedCodes = [];
+  
+  const count = Number(inviteCount.value) || 1;
+  adminStatus.textContent = count > 1 ? `正在生成 ${count} 个邀请码...` : "正在生成邀请码...";
 
   try {
-    const response = await fetch("/api/admin/invites", {
+    const response = await fetch("/api/admin/invites/batch", {
       method: "POST",
       headers: adminHeaders(),
       body: JSON.stringify({
         provider: inviteProvider.value,
         uses: Number(inviteUses.value),
+        count: count,
       }),
     });
     const payload = await readJsonResponse(response);
-    createdCode.textContent = payload.plaintext_code;
+    
+    lastCreatedCodes = payload.codes || [];
+    if (lastCreatedCodes.length === 1) {
+      createdCode.textContent = lastCreatedCodes[0];
+      copyCreatedCode.textContent = "复制";
+    } else {
+      createdCode.textContent = lastCreatedCodes.join("\n");
+      createdCode.style.whiteSpace = "pre-line";
+      copyCreatedCode.textContent = `复制全部 (${lastCreatedCodes.length})`;
+    }
+    
     copyCreatedCode.disabled = false;
-    adminStatus.textContent = "邀请码已生成。";
+    adminStatus.textContent = count > 1 ? `已生成 ${lastCreatedCodes.length} 个邀请码。` : "邀请码已生成。";
     await loadInvites();
   } catch (error) {
     adminStatus.textContent = error.message;
@@ -146,7 +163,7 @@ copyCreatedCode.addEventListener("click", async () => {
   try {
     await navigator.clipboard.writeText(code);
     copyCreatedCode.disabled = true;
-    copyCreatedCode.textContent = "已复制";
+    copyCreatedCode.textContent = lastCreatedCodes.length > 1 ? `已复制 (${lastCreatedCodes.length})` : "已复制";
     adminStatus.textContent = "新邀请码已复制。";
   } catch (error) {
     adminStatus.textContent = "复制失败，请手动选中邀请码。";

@@ -115,6 +115,27 @@ def create_app(
             return jsonify(ok=False, error=error.message), 400
         return jsonify(_created_invite_payload(invite))
 
+    @app.post("/api/admin/invites/batch")
+    def create_batch_admin_invites():
+        auth_error = require_admin()
+        if auth_error is not None:
+            return auth_error
+
+        payload = request.get_json(silent=True) or {}
+        provider = payload.get("provider", "seedream")
+        uses = payload.get("uses", 10)
+        count = min(max(int(payload.get("count", 1)), 1), 100)
+
+        codes = []
+        for _ in range(count):
+            try:
+                invite = invite_store.create_invite(provider=provider, uses=uses)
+                codes.append(invite.plaintext_code)
+            except InviteCodeError as error:
+                return jsonify(ok=False, error=error.message), 400
+
+        return jsonify({"ok": True, "codes": codes, "count": len(codes)})
+
     @app.get("/api/admin/invites")
     def list_admin_invites():
         auth_error = require_admin()

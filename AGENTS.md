@@ -62,6 +62,7 @@
 ## 常见问题和预防
 - **API Key 配置**: 需要在 .env 中配置 GEMINI_API_KEY、ARK_API_KEY、SEEDREAM_MODEL、ADMIN_PASSWORD
 - **积分规则**: Seedream 消耗 100 积分，Gemini 消耗 300 积分（按 100 的倍数计算）
+- **批量生成邀请码**: 管理员后台支持批量生成（1-100 个），适用于免费体验活动和售卖场景
 - **水印处理**: 生成前会自动尝试去除模板角落的平台水印
 - **状态记录**: 每次请求记录到 .state/generations.jsonl
 - **部署环境状态目录**: FaaS 部署环境文件系统只读，状态目录（uploads、outputs、数据库）默认使用 `/tmp/pet-meme-state`，可通过环境变量 `STATE_DIR` 自定义
