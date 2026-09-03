@@ -58,6 +58,7 @@
 - 使用 uv 管理 Python 环境（项目级虚拟环境）
 - 端口统一从 .preview 读取，不 hardcode
 - 对外只暴露 5000 端口
+- **图片风格**：默认使用低清模糊风格，让生成的图片看起来像被多次转存的 Meme（降低清晰度，增加压缩感）
 
 ## 常见问题和预防
 - **API Key 配置**: 需要在 .env 中配置 GEMINI_API_KEY、ARK_API_KEY、SEEDREAM_MODEL、ADMIN_PASSWORD

@@ -31,11 +31,12 @@ class GeminiImageGenerator:
         adjustment: str,
         aspect_ratio: str = "1:1",
         remove_watermark: bool = False,
+        low_quality: bool = False,
     ) -> GeneratedImage:
         if not self.api_key:
             raise ImageGenerationError("缺少 GEMINI_API_KEY，请先在本机环境变量或 .env 中填写。")
 
-        prompt = build_generation_prompt(len(pet_paths), adjustment, remove_watermark)
+        prompt = build_generation_prompt(len(pet_paths), adjustment, remove_watermark, low_quality)
         inputs = [{"type": "text", "text": prompt}]
         for path in [template_path, *pet_paths]:
             inputs.append(
@@ -92,6 +93,7 @@ class SeedreamImageGenerator:
         adjustment: str,
         aspect_ratio: str = "1:1",
         remove_watermark: bool = False,
+        low_quality: bool = False,
     ) -> GeneratedImage:
         if not self.api_key:
             raise ImageGenerationError("缺少 ARK_API_KEY，请先在本机 .env 中填写。")
@@ -101,7 +103,7 @@ class SeedreamImageGenerator:
             headers={"Authorization": f"Bearer {self.api_key}"},
             json={
                 "model": self.model_name,
-                "prompt": build_generation_prompt(len(pet_paths), adjustment, remove_watermark),
+                "prompt": build_generation_prompt(len(pet_paths), adjustment, remove_watermark, low_quality),
                 "image": [_as_data_url(path) for path in [template_path, *pet_paths]],
                 "response_format": "b64_json",
                 "size": _seedream_size(aspect_ratio),

@@ -166,6 +166,7 @@ def create_app(
         pets = request.files.getlist("pets")
         adjustment = request.form.get("adjustment", "")
         remove_watermark = request.form.get("remove_watermark") == "1"
+        low_quality = request.form.get("low_quality") == "1"
         if remove_watermark and request.form.get("rights_confirmed") != "1":
             return jsonify(ok=False, error="请先确认你有权使用并处理这张图片。"), 400
         template_width = request.form.get("template_width", "").strip()
@@ -249,6 +250,7 @@ def create_app(
                 adjustment,
                 aspect_ratio,
                 remove_watermark,
+                low_quality,
             )
         except ImageGenerationError as error:
             error_message = str(error)
