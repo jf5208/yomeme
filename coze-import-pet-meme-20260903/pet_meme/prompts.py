@@ -2,14 +2,14 @@ def build_generation_prompt(pet_count: int, adjustment: str, remove_watermark: b
     prompt = f"""Use the first image as the original single-animal Meme template.
 Use the next {pet_count} pet reference photos as the SOLE identity reference for the user's real pet.
 
-CRITICAL - Pet Identity Preservation:
-- The generated pet MUST be the user's actual pet from the reference photos, not a generic similar animal.
-- Strictly preserve the pet's REAL characteristics: fur color, fur pattern, face shape, eye color, ear shape, nose features, and fur length.
-- Do NOT replace the user's pet with a different breed, color, or style that merely looks similar.
-- Do NOT auto-correct or "improve" the pet's appearance into a different variety.
+CRITICAL - Two-Part Identity Rule:
+1. FROM THE TEMPLATE: preserve the original animal's BODY SHAPE, SIZE, POSTURE, POSE, and overall silhouette. If the template animal is round, chubby, or has a specific body shape, the generated pet MUST have the same body shape.
+2. FROM THE PET PHOTOS: preserve the pet's REAL identity features: fur color, fur pattern, face markings, eye color, ear shape, and nose features.
+
+The generated pet = Template's body shape + Pet's identity features.
 
 Goal:
-Replace ONLY the single animal subject in the Meme template with the user's pet, keeping the pet's true identity intact.
+Replace ONLY the single animal subject in the Meme template with the user's pet, keeping BOTH the template's body shape AND the pet's identity intact.
 
 Strict preservation requirements:
 - preserve all original visible text exactly; do not rewrite, translate, move, or restyle it.
@@ -18,7 +18,6 @@ Strict preservation requirements:
 - preserve the background, lighting direction, shadows, rough edges, transparency, blur, compression artifacts, low-resolution web-image texture, and screenshot-like quality.
 - keep the result feeling like the same internet Meme image, not a polished poster or studio illustration.
 - do not add extra animals, people, decorations, captions, logos, stickers, or story elements.
-- adapt the pet to fit the original animal's position and action in the frame, but NEVER alter the pet's core identity features.
 - the pet MUST look like a real photographed animal, NOT a cartoon, illustration, or drawing, because the reference photos are real pet photos.
 - even if the template has illustrated or stylized elements, the generated pet must remain photorealistic to match the user's real pet photos."""
 
