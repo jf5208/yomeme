@@ -60,7 +60,8 @@ templateInput.addEventListener("change", () => {
 templatePreview.addEventListener("load", () => {
   templateWidth.value = String(templatePreview.naturalWidth);
   templateHeight.value = String(templatePreview.naturalHeight);
-  const isSquare = templatePreview.naturalWidth === templatePreview.naturalHeight;
+  const ratio = Math.max(templatePreview.naturalWidth, templatePreview.naturalHeight) / Math.min(templatePreview.naturalWidth, templatePreview.naturalHeight);
+  const isSquare = ratio <= 1.5;
   templateRatio.textContent = isSquare ? "正方形模板" : "比例不符合要求";
   templateRatio.classList.toggle("invalid", !isSquare);
 });
@@ -86,8 +87,11 @@ form.addEventListener("submit", async (event) => {
     statusText.textContent = "正在读取 Meme 模板比例，请稍后再生成。";
     return;
   }
-  if (templateWidth.value !== templateHeight.value) {
-    statusText.textContent = "Meme 模板必须是正方形图片，请重新上传。";
+  const w = Number(templateWidth.value);
+  const h = Number(templateHeight.value);
+  const ratio = Math.max(w, h) / Math.min(w, h);
+  if (ratio > 1.5) {
+    statusText.textContent = "Meme 模板必须是接近正方形的图片（宽高比不超过 1.5），请重新上传。";
     return;
   }
   if (!inviteCode.value.trim()) {
