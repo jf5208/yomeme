@@ -19,7 +19,8 @@ Strict preservation requirements:
 - keep the result feeling like the same internet Meme image, not a polished poster or studio illustration.
 - do not add extra animals, people, decorations, captions, logos, stickers, or story elements.
 - adapt the pet to fit the original animal's position and action in the frame, but NEVER alter the pet's core identity features.
-- if the template is an illustration or low-quality image, preserve the template's composition and visual texture while retaining the user's pet identity."""
+- the pet MUST look like a real photographed animal, NOT a cartoon, illustration, or drawing, because the reference photos are real pet photos.
+- even if the template has illustrated or stylized elements, the generated pet must remain photorealistic to match the user's real pet photos."""
 
     if low_quality:
         prompt += """
