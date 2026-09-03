@@ -8,7 +8,7 @@ from typing import Callable
 
 
 SUPPORTED_PROVIDERS = {"gemini", "seedream"}
-CREDIT_COSTS = {"seedream": 1, "gemini": 3}
+CREDIT_COSTS = {"seedream": 100, "gemini": 300}
 EVENT_STATUSES = {"reserved", "succeeded", "failed"}
 RESERVATION_TTL = timedelta(minutes=10)
 
