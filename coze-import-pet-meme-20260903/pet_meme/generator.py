@@ -47,6 +47,9 @@ class GeminiImageGenerator:
                 }
             )
 
+        # Gemini API 可能只支持预设的 aspect_ratio，需要转换
+        gemini_aspect_ratio = _to_gemini_aspect_ratio(aspect_ratio)
+
         response = self.session.post(
             "https://generativelanguage.googleapis.com/v1beta/interactions",
             headers={"x-goog-api-key": self.api_key},
@@ -56,7 +59,7 @@ class GeminiImageGenerator:
                 "response_format": {
                     "type": "image",
                     "mime_type": "image/jpeg",
-                    "aspect_ratio": aspect_ratio,
+                    "aspect_ratio": gemini_aspect_ratio,
                 },
             },
             timeout=180,
@@ -168,7 +171,48 @@ def _seedream_size(aspect_ratio: str) -> str:
         "16:9": "2560x1440",
         "21:9": "3024x1296",
     }
-    return sizes.get(aspect_ratio, sizes["1:1"])
+    
+    # 如果是预设比例，直接返回
+    if aspect_ratio in sizes:
+        return sizes[aspect_ratio]
+    
+    # 如果是自定义比例（如 "1000:750"），计算最接近的预设尺寸
+    try:
+        w, h = map(int, aspect_ratio.split(":"))
+        if w <= 0 or h <= 0:
+            return sizes["1:1"]
+        
+        target_ratio = w / h
+        # 找到最接近的预设比例
+        best_match = min(sizes.keys(), key=lambda name: abs(_ratio_value(name) - target_ratio))
+        return sizes[best_match]
+    except (ValueError, ZeroDivisionError):
+        return sizes["1:1"]
+
+
+def _ratio_value(name: str) -> float:
+    w, h = map(int, name.split(":"))
+    return w / h
+
+
+def _to_gemini_aspect_ratio(aspect_ratio: str) -> str:
+    """将自定义比例转换为 Gemini API 支持的预设比例"""
+    gemini_ratios = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"]
+    
+    # 如果是预设比例，直接返回
+    if aspect_ratio in gemini_ratios:
+        return aspect_ratio
+    
+    # 如果是自定义比例，找到最接近的预设比例
+    try:
+        w, h = map(int, aspect_ratio.split(":"))
+        if w <= 0 or h <= 0:
+            return "1:1"
+        
+        target_ratio = w / h
+        return min(gemini_ratios, key=lambda name: abs(_ratio_value(name) - target_ratio))
+    except (ValueError, ZeroDivisionError):
+        return "1:1"
 
 
 def _extract_api_error(response) -> str:

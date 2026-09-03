@@ -444,17 +444,6 @@ def _closest_aspect_ratio(width_value: str, height_value: str) -> str:
     if width <= 0 or height <= 0:
         return "1:1"
 
-    ratios = {
-        "1:1": 1,
-        "2:3": 2 / 3,
-        "3:2": 3 / 2,
-        "3:4": 3 / 4,
-        "4:3": 4 / 3,
-        "4:5": 4 / 5,
-        "5:4": 5 / 4,
-        "9:16": 9 / 16,
-        "16:9": 16 / 9,
-        "21:9": 21 / 9,
-    }
-    template_ratio = width / height
-    return min(ratios, key=lambda name: abs(ratios[name] - template_ratio))
+    # 直接使用模板的实际宽高比，不强制匹配预设比例
+    # 这样生成的图片尺寸会跟模板保持一致
+    return f"{width}:{height}"
