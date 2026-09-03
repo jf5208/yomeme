@@ -178,8 +178,8 @@ def create_app(
             try:
                 w, h = int(template_width), int(template_height)
                 ratio = max(w, h) / min(w, h)
-                if ratio > 1.15:
-                    return jsonify(ok=False, error="Meme 模板必须是接近正方形的图片（长宽比不超过 1.15），请重新上传。"), 400
+                if ratio > 1.3:
+                    return jsonify(ok=False, error="Meme 模板必须是接近正方形的图片（长宽比不超过 1.3），请重新上传。"), 400
             except (ValueError, ZeroDivisionError):
                 return jsonify(ok=False, error="Meme 模板尺寸无效，请重新上传。"), 400
         access_method = request.form.get("access_method", "invite")
