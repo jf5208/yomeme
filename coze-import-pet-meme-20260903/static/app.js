@@ -98,7 +98,7 @@ form.addEventListener("submit", async (event) => {
   const formData = new FormData(form);
   submitButton.disabled = true;
   submitButton.textContent = "生成中...";
-  statusText.textContent = "正在生成，并尽量保留原图文字、构图和低清质感。";
+  statusText.textContent = "正在生成";
 
   try {
     const response = await fetch("/api/generate", {
