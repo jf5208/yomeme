@@ -150,8 +150,16 @@ def create_app(
         template_width = request.form.get("template_width", "").strip()
         template_height = request.form.get("template_height", "").strip()
         if template_width or template_height:
-            if not template_width or not template_height or template_width != template_height:
+            if not template_width or not template_height:
                 return jsonify(ok=False, error="Meme 模板必须是正方形图片，请重新上传。"), 400
+            # 允许接近 1:1 的比例（误差 15% 以内），适配截图等不精准的情况
+            try:
+                w, h = int(template_width), int(template_height)
+                ratio = max(w, h) / min(w, h)
+                if ratio > 1.15:
+                    return jsonify(ok=False, error="Meme 模板必须是接近正方形的图片（长宽比不超过 1.15），请重新上传。"), 400
+            except (ValueError, ZeroDivisionError):
+                return jsonify(ok=False, error="Meme 模板尺寸无效，请重新上传。"), 400
         access_method = request.form.get("access_method", "invite")
         aspect_ratio = _closest_aspect_ratio(
             request.form.get("template_width", ""),
