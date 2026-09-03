@@ -1,9 +1,15 @@
 def build_generation_prompt(pet_count: int, adjustment: str, remove_watermark: bool = False, low_quality: bool = False) -> str:
     prompt = f"""Use the first image as the original single-animal Meme template.
-Use the next {pet_count} pet reference photos only to understand the user's pet identity.
+Use the next {pet_count} pet reference photos as the SOLE identity reference for the user's real pet.
+
+CRITICAL - Pet Identity Preservation:
+- The generated pet MUST be the user's actual pet from the reference photos, not a generic similar animal.
+- Strictly preserve the pet's REAL characteristics: fur color, fur pattern, face shape, eye color, ear shape, nose features, and fur length.
+- Do NOT replace the user's pet with a different breed, color, or style that merely looks similar.
+- Do NOT auto-correct or "improve" the pet's appearance into a different variety.
 
 Goal:
-Replace only the single animal subject in the Meme template with the user's pet.
+Replace ONLY the single animal subject in the Meme template with the user's pet, keeping the pet's true identity intact.
 
 Strict preservation requirements:
 - preserve all original visible text exactly; do not rewrite, translate, move, or restyle it.
@@ -11,7 +17,9 @@ Strict preservation requirements:
 - preserve the Meme template's canvas shape and orientation; pet reference photos must never change the output aspect ratio.
 - preserve the background, lighting direction, shadows, rough edges, transparency, blur, compression artifacts, low-resolution web-image texture, and screenshot-like quality.
 - keep the result feeling like the same internet Meme image, not a polished poster or studio illustration.
-- do not add extra animals, people, decorations, captions, logos, stickers, or story elements."""
+- do not add extra animals, people, decorations, captions, logos, stickers, or story elements.
+- adapt the pet to fit the original animal's position and action in the frame, but NEVER alter the pet's core identity features.
+- if the template is an illustration or low-quality image, preserve the template's composition and visual texture while retaining the user's pet identity."""
 
     if low_quality:
         prompt += """

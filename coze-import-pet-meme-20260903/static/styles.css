@@ -88,6 +88,24 @@ form {
   font-weight: 700;
 }
 
+.upload-tips {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.upload-tips .tip-good {
+  margin: 0;
+  color: #1f6f64;
+}
+
+.upload-tips .tip-bad {
+  margin: 0;
+  color: #8b6f47;
+}
+
 input[type="file"],
 input[type="text"],
 input[type="password"],
