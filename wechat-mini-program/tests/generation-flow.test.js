@@ -601,7 +601,22 @@ test("多个分享口令保持有效，跨任务口令无效且响应只含脱�
 
   const owner = await getResult({ db, cloud, openid: "u1", jobId: job.jobId });
   assert.equal(owner.readOnly, false);
+  assert.equal(owner.canAdjust, true);
   assert.equal(owner.generatedAt, NOW.toISOString());
+
+  const adjusted = seedSucceededJob(db, {
+    _id: "adjusted-result-1234",
+    jobId: "adjusted-result-1234",
+    isRegeneration: true,
+    sourceJobId: job.jobId,
+  });
+  const adjustedResult = await getResult({
+    db,
+    cloud,
+    openid: "u1",
+    jobId: adjusted.jobId,
+  });
+  assert.equal(adjustedResult.canAdjust, false);
 });
 
 test("只有所有者能创建分享口令且任务必须已成功", async () => {

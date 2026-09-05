@@ -229,3 +229,11 @@
   color: #ffffff;
   background: #d9c7c2;
 }
+
+.progress-text {
+  display: block;
+  margin-top: 14rpx;
+  font-size: 24rpx;
+  text-align: center;
+  color: #847570;
+}

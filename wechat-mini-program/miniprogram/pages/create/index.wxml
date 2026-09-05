@@ -67,4 +67,5 @@
     loading="{{submitting}}"
     disabled="{{!template || pets.length === 0 || !rightsConfirmed || submitting}}"
   >{{submitting ? "正在准备…" : "生成我家版本"}}</button>
+  <text wx:if="{{submitting}}" class="progress-text">图片上传 {{uploadProgress}}%</text>
 </view>

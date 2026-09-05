@@ -1,1 +1,48 @@
-<view></view>
+<view class="page">
+  <view class="intro">
+    <text class="title">怎样更容易出好图</text>
+    <text class="intro-copy">选对模板，比写很多调整意见更重要。</text>
+  </view>
+
+  <view class="guide-section">
+    <text class="number">01</text>
+    <view class="guide-content">
+      <text class="section-title">模板选单只动物大头</text>
+      <text class="section-copy">只上传 1:1 正方形图片。动物主体清楚、动作不复杂、背景简单，效果通常更稳定。不要选多人、多动物、真人变动物或夸张复杂场景。</text>
+    </view>
+  </view>
+
+  <view class="guide-section">
+    <text class="number">02</text>
+    <view class="guide-content">
+      <text class="section-title">宠物照要认得出是谁</text>
+      <text class="section-copy">上传 1 到 3 张同一只宠物的照片。至少放一张清晰正脸照，再补充侧脸或花纹细节，避免严重遮挡和过暗照片。</text>
+    </view>
+  </view>
+
+  <view class="guide-section">
+    <text class="number">03</text>
+    <view class="guide-content">
+      <text class="section-title">第一次先看整体</text>
+      <text class="section-copy">生成时会尽量保留原图文字、构图、动作、神态、透明度、模糊度和低清网图质感，只替换动物主体。</text>
+    </view>
+  </view>
+
+  <view class="guide-section">
+    <text class="number">04</text>
+    <view class="guide-content">
+      <text class="section-title">调整意见只说最重要的一点</text>
+      <text class="section-copy">例如“耳朵更像第二张照片”或“眼神更委屈一点”。每个首次结果只能调整生成一次，再次生成会消耗 100 积分。</text>
+    </view>
+  </view>
+
+  <view class="guide-section">
+    <text class="number">05</text>
+    <view class="guide-content">
+      <text class="section-title">积分与素材授权</text>
+      <text class="section-copy">生成前会暂时扣除 100 积分；生成失败，本次未扣积分，系统会自动退回。请只上传本人创作、本人拍摄或已经获得授权的图片。</text>
+    </view>
+  </view>
+
+  <navigator class="primary-link" url="/pages/create/index" open-type="reLaunch">去做我家版本</navigator>
+</view>

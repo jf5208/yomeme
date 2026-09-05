@@ -1,4 +1,5 @@
 const { callApi } = require("../../services/api");
+const { uploadGenerationFiles } = require("../../services/uploads");
 const { isSupportedImage, isSquareImage, validatePetCount } = require("../../utils/image");
 
 function chooseImages(options) {
@@ -17,22 +18,6 @@ function getImageInfo(src) {
   });
 }
 
-function fileExtension(filePath) {
-  const extension = String(filePath).split(/[?#]/)[0].split(".").pop().toLowerCase();
-  return extension === "jpeg" ? "jpg" : extension;
-}
-
-function uploadFile(cloudPath, filePath) {
-  return new Promise((resolve, reject) => {
-    wx.cloud.uploadFile({
-      cloudPath,
-      filePath,
-      success: ({ fileID }) => resolve(fileID),
-      fail: reject,
-    });
-  });
-}
-
 function isCancelled(error) {
   return String((error && error.errMsg) || "").includes("cancel");
 }
@@ -43,6 +28,7 @@ Page({
     pets: [],
     rightsConfirmed: false,
     submitting: false,
+    uploadProgress: 0,
   },
 
   async chooseTemplate() {
@@ -119,22 +105,19 @@ Page({
       return;
     }
 
-    this.setData({ submitting: true });
+    this.setData({ submitting: true, uploadProgress: 0 });
     try {
       const prepared = await callApi("prepareGeneration");
       const jobId = prepared.data && prepared.data.jobId;
       if (!jobId) throw new Error("任务创建失败，请稍后再试。");
 
       const template = this.data.template;
-      const templateFileId = await uploadFile(
-        `uploads/${jobId}/template.${fileExtension(template.path)}`,
-        template.path,
-      );
-      const petFileIds = await Promise.all(
-        this.data.pets.map(({ path }, index) =>
-          uploadFile(`uploads/${jobId}/pet-${index + 1}.${fileExtension(path)}`, path),
-        ),
-      );
+      const { templateFileId, petFileIds } = await uploadGenerationFiles({
+        jobId,
+        templatePath: template.path,
+        petPaths: this.data.pets.map(({ path }) => path),
+        onProgress: (uploadProgress) => this.setData({ uploadProgress }),
+      });
 
       await callApi("generate", {
         jobId,

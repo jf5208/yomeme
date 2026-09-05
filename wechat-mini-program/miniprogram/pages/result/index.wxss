@@ -1,1 +1,160 @@
+.page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 32rpx 28rpx 56rpx;
+  color: #382f2c;
+  background: #fffaf7;
+}
 
+.topbar,
+.action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.topbar {
+  margin-bottom: 28rpx;
+}
+
+.brand {
+  font-size: 42rpx;
+  font-weight: 700;
+  color: #c95f55;
+}
+
+.credits-link {
+  padding: 14rpx 22rpx;
+  border: 1px solid #efd894;
+  border-radius: 8px;
+  font-size: 26rpx;
+  color: #654f27;
+  background: #ffedbd;
+}
+
+.result-frame {
+  overflow: hidden;
+  border: 1px solid #eaded8;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.result-image {
+  display: block;
+  width: 100%;
+}
+
+.generated-at {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  color: #95837d;
+}
+
+.action-row {
+  gap: 16rpx;
+  margin-top: 28rpx;
+}
+
+.primary-button,
+.secondary-button {
+  flex: 1;
+  min-height: 88rpx;
+  margin: 0;
+  border-radius: 8px;
+  font-size: 29rpx;
+  font-weight: 650;
+  line-height: 88rpx;
+}
+
+.primary-button {
+  color: #ffffff;
+  background: #d96b5b;
+}
+
+.secondary-button {
+  border: 1px solid #e4aaa3;
+  color: #b7544b;
+  background: #fffefe;
+}
+
+.primary-button::after,
+.secondary-button::after {
+  border: 0;
+}
+
+.primary-button[disabled] {
+  color: #ffffff;
+  background: #d9c7c2;
+}
+
+.read-only-note,
+.cost-note,
+.state-copy {
+  font-size: 25rpx;
+  line-height: 1.6;
+  color: #7b6d68;
+}
+
+.read-only-note {
+  margin-top: 26rpx;
+  padding: 20rpx;
+  border-radius: 8px;
+  background: #fff0dc;
+}
+
+.adjust-section {
+  margin-top: 44rpx;
+  padding-top: 34rpx;
+  border-top: 1px solid #eaded8;
+}
+
+.section-title,
+.state-title {
+  display: block;
+  font-size: 31rpx;
+  font-weight: 650;
+}
+
+.adjust-input {
+  width: 100%;
+  min-height: 180rpx;
+  box-sizing: border-box;
+  margin-top: 18rpx;
+  padding: 22rpx;
+  border: 1px solid #eaded8;
+  border-radius: 8px;
+  font-size: 27rpx;
+  line-height: 1.6;
+  background: #ffffff;
+}
+
+.cost-note {
+  display: block;
+  margin-top: 14rpx;
+}
+
+.full-button {
+  width: 100%;
+  margin-top: 22rpx;
+}
+
+.state-panel {
+  padding: 64rpx 28rpx;
+  text-align: center;
+}
+
+.state-copy {
+  display: block;
+  margin-top: 18rpx;
+}
+
+.primary-link {
+  display: block;
+  margin-top: 30rpx;
+  padding: 24rpx;
+  border-radius: 8px;
+  font-size: 29rpx;
+  color: #ffffff;
+  background: #d96b5b;
+}

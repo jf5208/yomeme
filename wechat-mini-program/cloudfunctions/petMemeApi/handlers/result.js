@@ -55,13 +55,20 @@ async function getResult({ db, cloud, openid, jobId, token }) {
   const imageUrl = job.status === "succeeded" && job.resultFileId
     ? await temporaryUrl(cloud, job.resultFileId)
     : null;
-  return {
+  const response = {
     jobId: job.jobId,
     status: job.status,
     imageUrl,
     generatedAt: isoString(job.completedAt),
     readOnly: !isOwner,
   };
+  if (isOwner) {
+    response.canAdjust = job.status === "succeeded"
+      && !job.isRegeneration
+      && !job.adjustmentReservedJobId
+      && !job.adjustmentSucceededJobId;
+  }
+  return response;
 }
 
 async function prepareShare({
