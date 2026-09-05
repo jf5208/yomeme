@@ -269,8 +269,9 @@ Expected: all tests PASS.
 
 **Interfaces:**
 - Produces: `TRIAL_CREDITS = 300`, `GENERATION_COST = 100`, `RESERVATION_TTL_MS = 10 * 60 * 1000`.
+- Produces: `createDatabase(cloud) -> Database`, configured with `{ throwOnNotFound: false }`.
 - Produces: `ensureUser({ db, openid, now }) -> Promise<UserBalance>`.
-- Produces: `reserveGeneration({ db, openid, jobId, templateFileId, petFileIds, adjustment, sourceJobId, now }) -> Promise<Job>`.
+- Produces: `reserveGeneration({ db, openid, jobId, templateFileId, petFileIds, adjustment, sourceJobId, now }) -> Promise<{ job: Job, acquired: boolean }>`.
 - Produces: `completeGeneration({ db, openid, jobId, resultFileId, now }) -> Promise<Job>`.
 - Produces: `refundGeneration({ db, openid, jobId, errorCode, now }) -> Promise<Job>`.
 - Produces: `validateGenerationInput(event) -> { fileIds: string[], adjustment: string }`.
@@ -290,8 +291,10 @@ test("同一个 jobId 只预占一次 100 积分", async () => {
   await ensureUser({ db, openid: "u1", now });
   const first = await reserveGeneration(inputFor("job-1"));
   const second = await reserveGeneration(inputFor("job-1"));
-  assert.equal(first.status, "reserved");
-  assert.equal(second.status, "reserved");
+  assert.equal(first.job.status, "reserved");
+  assert.equal(first.acquired, true);
+  assert.equal(second.job.status, "reserved");
+  assert.equal(second.acquired, false);
   assert.equal(db.users.u1.credits, 200);
 });
 
@@ -324,7 +327,7 @@ const ALLOWED_TRANSITIONS = {
 };
 ```
 
-重复 `reserve` 返回已有任务；重复 `complete` 或 `refund` 返回已完成任务，不再次改余额。余额小于 100 时抛出业务错误 `insufficient_credits`。
+重复 `reserve` 返回 `{ job: 已有任务, acquired: false }`；首次预占返回 `{ job: 新任务, acquired: true }`。重复 `complete` 或 `refund` 返回已完成任务，不再次改余额。余额小于 100 时抛出业务错误 `insufficient_credits`。
 
 - [ ] **Step 4: 实现服务端输入校验**
 
@@ -491,7 +494,7 @@ Expected: FAIL with `Cannot find module`.
 
 - [ ] **Step 4: 实现生成顺序**
 
-`prepareGeneration` 使用 `crypto.randomUUID()` 产生 `jobId` 并返回给当前用户，不预占积分。`generate` 严格按以下顺序执行：服务端校验、积分预占、下载模板与宠物照片、调用 Seedream、上传 `results/{openid}/{jobId}.png`、完成任务。任何下载、模型或上传异常都调用 `refundGeneration()`，然后返回“生成失败，本次未扣积分”。
+`prepareGeneration` 使用 `crypto.randomUUID()` 产生 `jobId` 并返回给当前用户，不预占积分。`generate` 严格按以下顺序执行：服务端校验、积分预占；若 `acquired === false`，直接返回已有任务，不执行任何外部工作；只有 `acquired === true` 才继续下载模板与宠物照片、调用 Seedream、上传 `results/{openid}/{jobId}.png`、完成任务。任何下载、模型或上传异常都调用 `refundGeneration()`，然后返回“生成失败，本次未扣积分”。
 
 - [ ] **Step 5: 实现超时恢复**
 

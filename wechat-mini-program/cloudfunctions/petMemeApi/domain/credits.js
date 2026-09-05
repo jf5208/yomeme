@@ -117,7 +117,7 @@ async function reserveGeneration({
       if (existingJob._openid !== openid) {
         throw businessError("job_conflict", "生成任务编号已被使用。");
       }
-      return existingJob;
+      return { job: existingJob, acquired: false };
     }
 
     let user = await getDocument(transaction, "users", openid);
@@ -159,7 +159,7 @@ async function reserveGeneration({
       createdAt,
     });
 
-    return job;
+    return { job, acquired: true };
   });
 }
 

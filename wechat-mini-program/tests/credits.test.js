@@ -9,6 +9,7 @@ const {
 } = require("../cloudfunctions/petMemeApi/domain/credits");
 const { validateGenerationInput } = require("../cloudfunctions/petMemeApi/domain/validation");
 const { bootstrap } = require("../cloudfunctions/petMemeApi/handlers/bootstrap");
+const { createDatabase } = require("../cloudfunctions/petMemeApi/config");
 
 const NOW = new Date("2026-09-05T08:00:00.000Z");
 
@@ -99,6 +100,22 @@ function inputFor(db, jobId, overrides = {}) {
   };
 }
 
+test("CloudBase 数据库查询缺失文档时返回空结果", () => {
+  const expectedDb = { runTransaction() {} };
+  let databaseOptions;
+  const cloud = {
+    database(options) {
+      databaseOptions = options;
+      return expectedDb;
+    },
+  };
+
+  const db = createDatabase(cloud);
+
+  assert.equal(db, expectedDb);
+  assert.deepEqual(databaseOptions, { throwOnNotFound: false });
+});
+
 test("新用户只领取一次 300 积分", async () => {
   const db = createMemoryDb();
 
@@ -131,30 +148,54 @@ test("并发初始化仍只发放一次体验积分", async () => {
   assert.equal(db.creditEvents.filter((row) => row.eventType === "trial").length, 1);
 });
 
-test("同一个 jobId 只预占一次 100 积分", async () => {
+test("同任务同用户并发预占只有一个调用获得执行权", async () => {
   const db = createMemoryDb();
   await ensureUser({ db, openid: "u1", now: NOW });
 
-  const first = await reserveGeneration(inputFor(db, "job-123456789012"));
-  const second = await reserveGeneration(inputFor(db, "job-123456789012"));
+  const [first, second] = await Promise.all([
+    reserveGeneration(inputFor(db, "job-123456789012")),
+    reserveGeneration(inputFor(db, "job-123456789012")),
+  ]);
 
-  assert.equal(first.status, "reserved");
-  assert.equal(second.status, "reserved");
-  assert.deepEqual(first.reservationExpiresAt, new Date("2026-09-05T08:10:00.000Z"));
+  assert.equal(first.acquired, true);
+  assert.equal(second.acquired, false);
+  assert.equal(first.job.status, "reserved");
+  assert.equal(second.job.status, "reserved");
+  assert.deepEqual(first.job.reservationExpiresAt, new Date("2026-09-05T08:10:00.000Z"));
   assert.equal(db.jobs["job-123456789012"]._id, "job-123456789012");
   assert.equal(db.users.u1.credits, 200);
   assert.equal(db.creditEvents.filter((row) => row.eventType === "generation_reserve").length, 1);
 });
 
-test("不同用户不能复用已有 jobId", async () => {
+test("同任务不同用户并发预占只有所有者成功", async () => {
   const db = createMemoryDb();
-  await reserveGeneration(inputFor(db, "job-123456789012"));
 
-  await assert.rejects(
-    () => reserveGeneration(inputFor(db, "job-123456789012", { openid: "u2" })),
-    (error) => error.code === "job_conflict",
-  );
+  const [owner, other] = await Promise.allSettled([
+    reserveGeneration(inputFor(db, "job-123456789012")),
+    reserveGeneration(inputFor(db, "job-123456789012", { openid: "u2" })),
+  ]);
+
+  assert.equal(owner.status, "fulfilled");
+  assert.equal(owner.value.acquired, true);
+  assert.equal(other.status, "rejected");
+  assert.equal(other.reason.code, "job_conflict");
+  assert.equal(db.jobs["job-123456789012"]._openid, "u1");
   assert.equal(db.users.u2, undefined);
+});
+
+test("同用户不同任务并发预占分别扣费", async () => {
+  const db = createMemoryDb();
+  await ensureUser({ db, openid: "u1", now: NOW });
+
+  const results = await Promise.all([
+    reserveGeneration(inputFor(db, "job-123456789001")),
+    reserveGeneration(inputFor(db, "job-123456789002")),
+  ]);
+
+  assert.deepEqual(results.map(({ acquired }) => acquired), [true, true]);
+  assert.deepEqual(results.map(({ job }) => job.jobId), ["job-123456789001", "job-123456789002"]);
+  assert.equal(db.users.u1.credits, 100);
+  assert.equal(db.creditEvents.filter((row) => row.eventType === "generation_reserve").length, 2);
 });
 
 test("余额不足时不创建任务或积分流水", async () => {
@@ -239,28 +280,36 @@ test("生成失败只退款一次", async () => {
   assert.equal(db.creditEvents.filter((row) => row.eventType === "generation_refund").length, 1);
 });
 
-test("终态任务不能被另一种完成操作改写", async () => {
-  const db = createMemoryDb();
-  await reserveGeneration(inputFor(db, "job-123456789012"));
-  await completeGeneration({
-    db,
-    openid: "u1",
-    jobId: "job-123456789012",
-    resultFileId: "cloud://env/results/job.png",
-    now: NOW,
-  });
+test("完成与退款竞态只提交第一个终态", async () => {
+  for (const firstAction of ["complete", "refund"]) {
+    const db = createMemoryDb();
+    await reserveGeneration(inputFor(db, "job-123456789012"));
+    const complete = () => completeGeneration({
+      db,
+      openid: "u1",
+      jobId: "job-123456789012",
+      resultFileId: "cloud://env/results/job.png",
+      now: NOW,
+    });
+    const refund = () => refundGeneration({
+      db,
+      openid: "u1",
+      jobId: "job-123456789012",
+      errorCode: "provider_failed",
+      now: NOW,
+    });
+    const operations = firstAction === "complete" ? [complete(), refund()] : [refund(), complete()];
 
-  const result = await refundGeneration({
-    db,
-    openid: "u1",
-    jobId: "job-123456789012",
-    errorCode: "late_failure",
-    now: NOW,
-  });
+    const outcomes = await Promise.all(operations);
 
-  assert.equal(result.status, "succeeded");
-  assert.equal(db.users.u1.credits, 200);
-  assert.equal(db.creditEvents.filter((row) => row.eventType === "generation_refund").length, 0);
+    const expectedStatus = firstAction === "complete" ? "succeeded" : "failed";
+    const expectedBalance = firstAction === "complete" ? 200 : 300;
+    assert.deepEqual(outcomes.map(({ status }) => status), [expectedStatus, expectedStatus]);
+    assert.equal(db.jobs["job-123456789012"].status, expectedStatus);
+    assert.equal(db.users.u1.credits, expectedBalance);
+    assert.equal(db.creditEvents.filter((row) => row.eventType === "generation_success").length, firstAction === "complete" ? 1 : 0);
+    assert.equal(db.creditEvents.filter((row) => row.eventType === "generation_refund").length, firstAction === "refund" ? 1 : 0);
+  }
 });
 
 test("生成输入校验后返回按模板优先排列的云文件", () => {
