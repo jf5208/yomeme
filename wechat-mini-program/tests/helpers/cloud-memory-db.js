@@ -10,6 +10,9 @@ function matches(value, expected) {
   if (expected && expected.__operator === "lte") {
     return comparable(value) <= comparable(expected.value);
   }
+  if (expected && expected.__operator === "in") {
+    return expected.values.includes(value);
+  }
   return comparable(value) === comparable(expected);
 }
 
@@ -49,6 +52,10 @@ function createMemoryDb(initial = {}) {
             if (!rows[id]) throw new Error(`Missing document: ${name}/${id}`);
             rows[id] = { ...rows[id], ...clone(data), _id: id };
             return { stats: { updated: 1 } };
+          },
+          async remove() {
+            delete rows[id];
+            return { stats: { removed: 1 } };
           },
         };
       },
@@ -101,6 +108,9 @@ function createMemoryDb(initial = {}) {
     command: {
       lte(value) {
         return { __operator: "lte", value };
+      },
+      in(values) {
+        return { __operator: "in", values };
       },
     },
     collection(name) {

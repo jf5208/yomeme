@@ -2,6 +2,8 @@ const TRIAL_CREDITS = 300;
 const GENERATION_COST = 100;
 const RESERVATION_TTL_MS = 10 * 60 * 1000;
 const PREPARATION_TTL_MS = 10 * 60 * 1000;
+const SHARE_GRANT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const RESULT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 function createDatabase(cloud) {
   return cloud.database({ throwOnNotFound: false });
@@ -12,5 +14,7 @@ module.exports = {
   GENERATION_COST,
   RESERVATION_TTL_MS,
   PREPARATION_TTL_MS,
+  SHARE_GRANT_TTL_MS,
+  RESULT_RETENTION_MS,
   createDatabase,
 };

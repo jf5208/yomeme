@@ -183,8 +183,11 @@ test("提交先获取服务端任务编号，再按编号上传并进入结果�
   assert.deepEqual(events.map(({ type, action }) => action || type), [
     "prepareGeneration",
     "upload",
+    "registerUpload",
     "upload",
+    "registerUpload",
     "upload",
+    "registerUpload",
     "generate",
     "navigate",
   ]);

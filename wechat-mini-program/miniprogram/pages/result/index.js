@@ -67,7 +67,10 @@ Page({
         }
       }
     } catch (error) {
-      this.setData({ status: "failed" });
+      const sharedLinkUnavailable = Boolean(this.data.incomingToken)
+        && ["forbidden", "result_not_ready", "result_unavailable", "job_not_found"]
+          .includes(error.code);
+      this.setData({ status: sharedLinkUnavailable ? "shareUnavailable" : "failed" });
       toast(error.message || "结果暂时无法读取");
     } finally {
       this.setData({ loading: false });

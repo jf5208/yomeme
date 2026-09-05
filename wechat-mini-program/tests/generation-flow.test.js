@@ -4,6 +4,7 @@ const crypto = require("node:crypto");
 
 const {
   prepareGeneration,
+  registerUpload,
   generate,
   extractCloudPath,
   validateDownloadedImage,
@@ -59,6 +60,7 @@ function seedPreparation(db, jobId, overrides = {}) {
     environmentId: "env-current",
     createdAt: NOW,
     expiresAt: new Date("2026-09-05T08:30:00.000Z"),
+    uploadedFileIds: [],
     ...overrides,
   };
   db.seed("generation_preparations", preparation);
@@ -66,7 +68,7 @@ function seedPreparation(db, jobId, overrides = {}) {
 }
 
 function createCloud(files = {}) {
-  const calls = { downloads: [], uploads: [], tempUrls: [] };
+  const calls = { downloads: [], uploads: [], deletions: [], tempUrls: [] };
   return {
     calls,
     async downloadFile({ fileID }) {
@@ -77,6 +79,10 @@ function createCloud(files = {}) {
     async uploadFile({ cloudPath, fileContent }) {
       calls.uploads.push({ cloudPath, fileContent });
       return { fileID: `cloud://env/${cloudPath}` };
+    },
+    async deleteFile({ fileList }) {
+      calls.deletions.push(...fileList);
+      return { fileList: fileList.map((fileID) => ({ fileID, status: 0 })) };
     },
     async getTempFileURL({ fileList }) {
       calls.tempUrls.push([...fileList]);
@@ -136,7 +142,41 @@ test("prepareGeneration 只返回服务端 UUID 且不预占积分", async () =>
     environmentId: "env-current",
     createdAt: NOW,
     expiresAt: new Date("2026-09-05T08:30:00.000Z"),
+    uploadedFileIds: [],
   });
+});
+
+test("上传成功后立即登记到本人准备凭证供过期清理", async () => {
+  const db = createMemoryDb();
+  const event = firstEvent();
+  seedPreparation(db, event.jobId);
+
+  for (const fileId of [event.templateFileId, ...event.petFileIds]) {
+    await registerUpload({
+      db,
+      openid: "u1",
+      environmentId: "env-current",
+      jobId: event.jobId,
+      fileId,
+      now: NOW,
+    });
+  }
+
+  assert.deepEqual(
+    db.rows("generation_preparations")[event.jobId].uploadedFileIds,
+    [event.templateFileId, ...event.petFileIds],
+  );
+  await assert.rejects(
+    () => registerUpload({
+      db,
+      openid: "u2",
+      environmentId: "env-current",
+      jobId: event.jobId,
+      fileId: event.templateFileId,
+      now: NOW,
+    }),
+    (error) => error.code === "forbidden",
+  );
 });
 
 test("首次生成成功后扣 100 积分、保存固定结果路径并完成任务", async () => {
@@ -178,6 +218,7 @@ test("首次生成成功后扣 100 积分、保存固定结果路径并完成任
     "image/jpeg",
     "image/jpeg",
   ]);
+  assert.equal(db.rows("generation_preparations")[event.jobId], undefined);
 });
 
 test("相同 jobId 重试只返回已有状态且不重复外部工作或扣费", async () => {
@@ -243,6 +284,122 @@ test("预占后的任意失败都会幂等退款并只保存安全错误码", as
   assert.equal(db.rows("generation_jobs")[event.jobId].status, "failed");
   assert.equal(db.rows("generation_jobs")[event.jobId].errorCode, "generation_failed");
   assert.equal(JSON.stringify(db.rows("generation_jobs")).includes("secret"), false);
+});
+
+test("结果上传后结算失败会删除孤立结果并退款", async () => {
+  const db = createMemoryDb();
+  const event = firstEvent();
+  seedPreparation(db, event.jobId);
+  const originalRunTransaction = db.runTransaction.bind(db);
+  let transactionCalls = 0;
+  db.runTransaction = async (callback) => {
+    transactionCalls += 1;
+    if (transactionCalls === 2) throw new Error("completion unavailable");
+    return originalRunTransaction(callback);
+  };
+  const cloud = createCloud({
+    [event.templateFileId]: PNG,
+    [event.petFileIds[0]]: JPEG,
+    [event.petFileIds[1]]: JPEG,
+  });
+
+  await assert.rejects(
+    () => generate({
+      db,
+      cloud,
+      openid: "u1",
+      environmentId: "env-current",
+      event,
+      now: NOW,
+      generateImage: async () => ({ bytes: PNG, mimeType: "image/png" }),
+    }),
+    (error) => error.code === "generation_failed",
+  );
+
+  assert.deepEqual(cloud.calls.deletions, [`cloud://env/results/u1/${event.jobId}.png`]);
+  assert.equal(db.rows("generation_jobs")[event.jobId].status, "failed");
+  assert.equal(db.rows("generation_jobs")[event.jobId].pendingResultFileId, null);
+  assert.equal(db.rows("users").u1.credits, 300);
+});
+
+test("孤立结果即时删除失败时在任务中保留文件编号供定时清理", async () => {
+  const db = createMemoryDb();
+  const event = firstEvent();
+  seedPreparation(db, event.jobId);
+  const originalRunTransaction = db.runTransaction.bind(db);
+  let transactionCalls = 0;
+  db.runTransaction = async (callback) => {
+    transactionCalls += 1;
+    if (transactionCalls === 2) throw new Error("completion unavailable");
+    return originalRunTransaction(callback);
+  };
+  const cloud = createCloud({
+    [event.templateFileId]: PNG,
+    [event.petFileIds[0]]: JPEG,
+    [event.petFileIds[1]]: JPEG,
+  });
+  cloud.deleteFile = async ({ fileList }) => ({
+    fileList: fileList.map((fileID) => ({ fileID, status: -1, errCode: "delete_failed" })),
+  });
+
+  await assert.rejects(
+    () => generate({
+      db,
+      cloud,
+      openid: "u1",
+      environmentId: "env-current",
+      event,
+      now: NOW,
+      generateImage: async () => ({ bytes: PNG, mimeType: "image/png" }),
+    }),
+    (error) => error.code === "generation_failed",
+  );
+
+  assert.equal(
+    db.rows("generation_jobs")[event.jobId].pendingResultFileId,
+    `cloud://env/results/u1/${event.jobId}.png`,
+  );
+});
+
+test("孤立结果已被生命周期删除时按清理成功处理", async () => {
+  const db = createMemoryDb();
+  const event = firstEvent();
+  seedPreparation(db, event.jobId);
+  const originalRunTransaction = db.runTransaction.bind(db);
+  let transactionCalls = 0;
+  db.runTransaction = async (callback) => {
+    transactionCalls += 1;
+    if (transactionCalls === 2) throw new Error("completion unavailable");
+    return originalRunTransaction(callback);
+  };
+  const cloud = createCloud({
+    [event.templateFileId]: PNG,
+    [event.petFileIds[0]]: JPEG,
+    [event.petFileIds[1]]: JPEG,
+  });
+  cloud.deleteFile = async ({ fileList }) => ({
+    fileList: fileList.map((fileID) => ({
+      fileID,
+      status: -503003,
+      errMsg: "storage file not exists",
+    })),
+  });
+
+  await assert.rejects(
+    () => generate({
+      db,
+      cloud,
+      openid: "u1",
+      environmentId: "env-current",
+      event,
+      now: NOW,
+      generateImage: async () => ({ bytes: PNG, mimeType: "image/png" }),
+    }),
+    (error) => error.code === "generation_failed",
+  );
+
+  assert.equal(db.rows("generation_jobs")[event.jobId].pendingResultFileId, null);
+  assert.equal(db.rows("users").u1.credits, 300);
 });
 
 test("首次生成只接受当前 jobId 的固定上传目录和文件名", async () => {
@@ -552,7 +709,7 @@ test("多个分享口令保持有效，跨任务口令无效且响应只含脱�
   assert.equal(JSON.stringify(db.rows("share_grants")).includes(secondToken), false);
 
   await assert.rejects(
-    () => getResult({ db, cloud, openid: "u2", jobId: job.jobId, token: "wrong" }),
+    () => getResult({ db, cloud, openid: "u2", jobId: job.jobId, token: "wrong", now: NOW }),
     (error) => error.code === "forbidden",
   );
   const shared = await getResult({
@@ -561,6 +718,7 @@ test("多个分享口令保持有效，跨任务口令无效且响应只含脱�
     openid: "u2",
     jobId: job.jobId,
     token: firstToken,
+    now: NOW,
   });
   assert.deepEqual(Object.keys(shared).sort(), [
     "generatedAt",
@@ -581,8 +739,23 @@ test("多个分享口令保持有效，跨任务口令无效且响应只含脱�
     openid: "u3",
     jobId: job.jobId,
     token: secondToken,
+    now: NOW,
   });
   assert.equal(secondShared.readOnly, true);
+
+  const firstGrant = db.rows("share_grants")[firstHash];
+  assert.ok(firstGrant.expiresAt instanceof Date);
+  await assert.rejects(
+    () => getResult({
+      db,
+      cloud,
+      openid: "u4",
+      jobId: job.jobId,
+      token: firstToken,
+      now: new Date(firstGrant.expiresAt.getTime() + 1),
+    }),
+    (error) => error.code === "forbidden",
+  );
 
   const otherJob = seedSucceededJob(db, {
     _id: "other-source-123456",
@@ -595,11 +768,12 @@ test("多个分享口令保持有效，跨任务口令无效且响应只含脱�
       openid: "u2",
       jobId: otherJob.jobId,
       token: firstToken,
+      now: NOW,
     }),
     (error) => error.code === "forbidden",
   );
 
-  const owner = await getResult({ db, cloud, openid: "u1", jobId: job.jobId });
+  const owner = await getResult({ db, cloud, openid: "u1", jobId: job.jobId, now: NOW });
   assert.equal(owner.readOnly, false);
   assert.equal(owner.canAdjust, true);
   assert.equal(owner.generatedAt, NOW.toISOString());
@@ -617,6 +791,56 @@ test("多个分享口令保持有效，跨任务口令无效且响应只含脱�
     jobId: adjusted.jobId,
   });
   assert.equal(adjustedResult.canAdjust, false);
+
+  const cleaned = seedSucceededJob(db, {
+    _id: "cleaned-source-1234",
+    jobId: "cleaned-source-1234",
+    originalsCleaned: true,
+    templateFileId: null,
+    petFileIds: [],
+  });
+  const cleanedResult = await getResult({
+    db,
+    cloud,
+    openid: "u1",
+    jobId: cleaned.jobId,
+    now: NOW,
+  });
+  assert.equal(cleanedResult.canAdjust, false);
+
+  const cleanupClaimed = seedSucceededJob(db, {
+    _id: "cleanup-claimed-1234",
+    jobId: "cleanup-claimed-1234",
+    cleanupClaimed: true,
+  });
+  const cleanupClaimedResult = await getResult({
+    db,
+    cloud,
+    openid: "u1",
+    jobId: cleanupClaimed.jobId,
+    now: NOW,
+  });
+  assert.equal(cleanupClaimedResult.canAdjust, false);
+});
+
+test("分享口令不会超过作品剩余保存期", async () => {
+  const db = createMemoryDb();
+  const createdAt = new Date(NOW.getTime() - 29 * 24 * 60 * 60 * 1000);
+  const job = seedSucceededJob(db, { createdAt });
+  const bytes = Buffer.from("22112233445566778899aabbccddeeff0033", "hex");
+  const share = await prepareShare({
+    db,
+    openid: "u1",
+    jobId: job.jobId,
+    randomBytes: () => bytes,
+    now: NOW,
+  });
+  const hash = crypto.createHash("sha256").update(share.token).digest("hex");
+
+  assert.equal(
+    db.rows("share_grants")[hash].expiresAt.getTime(),
+    createdAt.getTime() + 30 * 24 * 60 * 60 * 1000,
+  );
 });
 
 test("只有所有者能创建分享口令且任务必须已成功", async () => {
@@ -703,6 +927,41 @@ test("到达 reservationExpiresAt 后立即恢复，不额外等待十分钟", a
   assert.deepEqual(result, { recovered: 1 });
   assert.equal(db.rows("generation_jobs")[jobId].status, "failed");
   assert.equal(db.rows("users").u1.credits, 300);
+});
+
+test("结算已提交但回包失败时保留成功结果且不退款", async () => {
+  const db = createMemoryDb();
+  const event = firstEvent();
+  seedPreparation(db, event.jobId);
+  const originalRunTransaction = db.runTransaction.bind(db);
+  let transactionCalls = 0;
+  db.runTransaction = async (callback) => {
+    transactionCalls += 1;
+    const result = await originalRunTransaction(callback);
+    if (transactionCalls === 2) throw new Error("completion response lost");
+    return result;
+  };
+  const cloud = createCloud({
+    [event.templateFileId]: PNG,
+    [event.petFileIds[0]]: JPEG,
+    [event.petFileIds[1]]: JPEG,
+  });
+
+  const result = await generate({
+    db,
+    cloud,
+    openid: "u1",
+    environmentId: "env-current",
+    event,
+    now: NOW,
+    generateImage: async () => ({ bytes: PNG, mimeType: "image/png" }),
+  });
+
+  assert.deepEqual(result, { jobId: event.jobId, status: "succeeded" });
+  assert.deepEqual(cloud.calls.deletions, []);
+  assert.equal(db.rows("generation_jobs")[event.jobId].status, "succeeded");
+  assert.equal(db.rows("generation_jobs")[event.jobId].pendingResultFileId, null);
+  assert.equal(db.rows("users").u1.credits, 200);
 });
 
 test("管理员恢复分页扫描全部过期预占任务且非管理员被拒绝", async () => {

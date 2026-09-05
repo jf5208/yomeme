@@ -94,3 +94,11 @@ logs/
 # CodeGraph index
 .codegraph
 .worktrees/
+
+# WeChat Mini Program local and private files
+wechat-mini-program/project.private.config.json
+wechat-mini-program/**/node_modules/
+wechat-mini-program/**/*.log
+wechat-mini-program/.env*
+wechat-mini-program/miniprogram/uploads/
+wechat-mini-program/miniprogram/temp/

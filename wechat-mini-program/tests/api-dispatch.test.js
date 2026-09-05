@@ -64,6 +64,7 @@ test("action 是固定白名单且未知 action 被拒绝", async () => {
     "prepareShare",
     "recoverStaleJobs",
     "redeem",
+    "registerUpload",
   ]);
 
   const result = await dispatch({ action: "dropDatabase" }, dependencies());

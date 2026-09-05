@@ -3,14 +3,16 @@ function fileExtension(filePath) {
   return extension === "jpeg" ? "jpg" : extension;
 }
 
-function uploadOne({ cloudPath, filePath, onProgress }) {
+function uploadOne({ cloudPath, filePath, onProgress, onUploaded }) {
   return new Promise((resolve, reject) => {
     const task = wx.cloud.uploadFile({
       cloudPath,
       filePath,
       success({ fileID }) {
-        onProgress(100);
-        resolve(fileID);
+        Promise.resolve(onUploaded(fileID)).then(() => {
+          onProgress(100);
+          resolve(fileID);
+        }, reject);
       },
       fail: reject,
     });
@@ -25,6 +27,7 @@ async function uploadGenerationFiles({
   templatePath,
   petPaths,
   onProgress = () => {},
+  onUploaded = () => {},
 }) {
   const paths = [templatePath, ...petPaths];
   const progressByFile = paths.map(() => 0);
@@ -43,6 +46,7 @@ async function uploadGenerationFiles({
     cloudPath: cloudPaths[index],
     filePath,
     onProgress: (progress) => report(index, progress),
+    onUploaded,
   })));
   return {
     templateFileId: fileIds[0],

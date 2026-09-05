@@ -116,6 +116,18 @@ function validateUploadLayout({ jobId, templateFileId, petFileIds, environmentId
   }
 }
 
+function validateTrackedUpload({ jobId, fileId, environmentId }) {
+  validateFileEnvironment([fileId], environmentId);
+  const escapedJobId = jobId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(
+    `^uploads/${escapedJobId}/(?:template|pet-[1-3])\\.${IMAGE_EXTENSION_PATTERN}$`,
+    "i",
+  );
+  if (!pattern.test(extractCloudPath(fileId) || "")) {
+    throw businessError("invalid_input", "上传文件路径无效。");
+  }
+}
+
 function invalidImage() {
   return businessError("invalid_image", "图片文件无效。");
 }
@@ -257,6 +269,39 @@ function safeFailureCode(error) {
   return error && SAFE_FAILURE_CODES.has(error.code) ? error.code : "generation_failed";
 }
 
+function missingStorageFile(value) {
+  const text = String(value || "").toLowerCase();
+  return text.includes("storage_file_nonexist") || text.includes("storage file not exists");
+}
+
+function missingStorageOutcome(outcome) {
+  return Boolean(outcome) && (
+    outcome.status === -503003
+    || missingStorageFile(outcome.errCode)
+    || missingStorageFile(outcome.code)
+    || missingStorageFile(outcome.errMsg)
+  );
+}
+
+async function deleteUploadedResult(cloud, fileId) {
+  try {
+    const result = await cloud.deleteFile({ fileList: [fileId] });
+    const outcome = result && Array.isArray(result.fileList) ? result.fileList[0] : null;
+    return Boolean(outcome) && (
+      outcome.status === 0
+      || missingStorageOutcome(outcome)
+    );
+  } catch (error) {
+    return missingStorageFile(error && error.code) || missingStorageFile(error && error.message);
+  }
+}
+
+async function trackPendingResult(db, jobId, pendingResultFileId) {
+  await db.collection("generation_jobs").doc(jobId).update({
+    data: { pendingResultFileId },
+  });
+}
+
 async function prepareGeneration({
   db,
   openid,
@@ -277,9 +322,38 @@ async function prepareGeneration({
       environmentId,
       createdAt,
       expiresAt: new Date(createdAt.getTime() + PREPARATION_TTL_MS),
+      uploadedFileIds: [],
     },
   });
   return { jobId };
+}
+
+async function registerUpload({ db, openid, environmentId, jobId, fileId, now }) {
+  requireOpenid(openid);
+  requireEnvironmentId(environmentId);
+  requireJobId(jobId);
+  validateTrackedUpload({ jobId, fileId, environmentId });
+
+  await db.runTransaction(async (transaction) => {
+    const preparation = await requirePreparation({
+      db: transaction,
+      openid,
+      environmentId,
+      jobId,
+      now,
+    });
+    const uploadedFileIds = Array.isArray(preparation.uploadedFileIds)
+      ? [...preparation.uploadedFileIds]
+      : [];
+    if (!uploadedFileIds.includes(fileId)) uploadedFileIds.push(fileId);
+    if (uploadedFileIds.length > 4) {
+      throw businessError("invalid_input", "上传图片数量无效。");
+    }
+    await transaction.collection("generation_preparations").doc(jobId).update({
+      data: { uploadedFileIds },
+    });
+  });
+  return { registered: true };
 }
 
 async function generate({
@@ -311,7 +385,9 @@ async function generate({
   });
   if (!reservation.acquired) return sanitizedStatus(reservation.job);
 
+  let uploadedResultFileId = null;
   try {
+    await db.collection("generation_preparations").doc(resolved.jobId).remove();
     const fileIds = [resolved.templateFileId, ...resolved.petFileIds];
     const downloads = [];
     for (const fileID of fileIds) {
@@ -329,6 +405,8 @@ async function generate({
     if (!uploaded || typeof uploaded.fileID !== "string" || !extractCloudPath(uploaded.fileID)) {
       throw businessError("upload_failed", "生成结果保存失败。");
     }
+    uploadedResultFileId = uploaded.fileID;
+    await trackPendingResult(db, resolved.jobId, uploadedResultFileId);
     const completed = await completeGeneration({
       db,
       openid,
@@ -338,19 +416,35 @@ async function generate({
     });
     return sanitizedStatus(completed);
   } catch (error) {
-    await refundGeneration({
-      db,
-      openid,
-      jobId: resolved.jobId,
-      errorCode: safeFailureCode(error),
-      now,
-    });
+    let refunded;
+    try {
+      refunded = await refundGeneration({
+        db,
+        openid,
+        jobId: resolved.jobId,
+        errorCode: safeFailureCode(error),
+        now,
+      });
+    } catch (_refundError) {
+      throw businessError("generation_failed", "生成失败，请稍后查看任务状态。");
+    }
+    if (refunded.status === "succeeded") return sanitizedStatus(refunded);
+
+    if (uploadedResultFileId && typeof cloud.deleteFile === "function") {
+      const deleted = await deleteUploadedResult(cloud, uploadedResultFileId);
+      try {
+        await trackPendingResult(db, resolved.jobId, deleted ? null : uploadedResultFileId);
+      } catch (_trackingError) {
+        // Storage lifecycle rules remain the final fallback if both tracking and cleanup fail.
+      }
+    }
     throw businessError("generation_failed", "生成失败，本次未扣积分。");
   }
 }
 
 module.exports = {
   prepareGeneration,
+  registerUpload,
   generate,
   extractCloudPath,
   validateDownloadedImage,

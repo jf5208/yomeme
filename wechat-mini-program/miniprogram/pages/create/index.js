@@ -117,6 +117,7 @@ Page({
         templatePath: template.path,
         petPaths: this.data.pets.map(({ path }) => path),
         onProgress: (uploadProgress) => this.setData({ uploadProgress }),
+        onUploaded: (fileId) => callApi("registerUpload", { jobId, fileId }),
       });
 
       await callApi("generate", {

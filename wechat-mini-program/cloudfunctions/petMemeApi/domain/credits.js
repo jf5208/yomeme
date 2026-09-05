@@ -104,6 +104,7 @@ async function claimAdjustmentSlot({ transaction, openid, sourceJobId, jobId }) 
   if (
     source.status !== "succeeded"
     || source.isRegeneration
+    || source.cleanupClaimed
     || typeof source.templateFileId !== "string"
     || !Array.isArray(source.petFileIds)
   ) {
@@ -172,6 +173,7 @@ async function reserveGeneration({
       templateFileId: resolvedTemplateFileId,
       petFileIds: resolvedPetFileIds,
       resultFileId: null,
+      pendingResultFileId: null,
       adjustment: adjustment || "",
       sourceJobId: sourceJobId || null,
       isRegeneration: Boolean(sourceJobId),
@@ -179,6 +181,7 @@ async function reserveGeneration({
       createdAt,
       completedAt: null,
       reservationExpiresAt: new Date(createdAt.getTime() + RESERVATION_TTL_MS),
+      originalsCleaned: false,
     };
 
     await transaction.collection("users").doc(openid).update({
@@ -216,6 +219,7 @@ async function completeGeneration({ db, openid, jobId, resultFileId, now }) {
     const update = {
       status: "succeeded",
       resultFileId,
+      pendingResultFileId: null,
       errorCode: null,
       completedAt,
     };

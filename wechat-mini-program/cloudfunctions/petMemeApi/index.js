@@ -1,6 +1,6 @@
 const { createDatabase } = require("./config");
 const { bootstrap } = require("./handlers/bootstrap");
-const { prepareGeneration, generate } = require("./handlers/generate");
+const { prepareGeneration, registerUpload, generate } = require("./handlers/generate");
 const { getResult, prepareShare } = require("./handlers/result");
 const { redeem } = require("./handlers/redeem");
 const {
@@ -46,6 +46,14 @@ const ACTIONS = Object.freeze({
     now,
     randomUUID,
   }),
+  registerUpload: ({ db, openid, environmentId, event, now }) => registerUpload({
+    db,
+    openid,
+    environmentId,
+    jobId: event.jobId,
+    fileId: event.fileId,
+    now,
+  }),
   generate: ({ db, cloud, openid, environmentId, event, now, generateImage }) => generate({
     db,
     cloud,
@@ -55,12 +63,13 @@ const ACTIONS = Object.freeze({
     now,
     generateImage,
   }),
-  getResult: ({ db, cloud, openid, event }) => getResult({
+  getResult: ({ db, cloud, openid, event, now }) => getResult({
     db,
     cloud,
     openid,
     jobId: event.jobId,
     token: event.token,
+    now,
   }),
   prepareShare: ({ db, openid, event, now, randomBytes }) => prepareShare({
     db,

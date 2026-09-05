@@ -1,1 +1,51 @@
-<view></view>
+<view class="page">
+  <view wx:if="{{loading}}" class="state">正在验证管理员身份…</view>
+  <view wx:elif="{{authorized === false}}" class="state">
+    <text class="state-title">此页面仅限管理员使用</text>
+    <text class="state-copy">普通用户不会看到发码功能。</text>
+  </view>
+
+  <view wx:else>
+    <text class="title">充值码管理</text>
+    <text class="subtitle">每次可生成 1 到 50 个充值码，默认每个充值 1000 积分。</text>
+
+    <view class="form-row">
+      <label class="field">
+        <text>生成数量</text>
+        <input type="number" value="{{count}}" bindinput="onCountInput" />
+      </label>
+      <label class="field">
+        <text>每码积分</text>
+        <input type="number" value="{{credits}}" bindinput="onCreditsInput" />
+      </label>
+    </view>
+    <button class="create-button" bindtap="createCodes" loading="{{creating}}">生成充值码</button>
+
+    <view wx:if="{{newCodes.length}}" class="new-code-section">
+      <text class="section-title">新生成的充值码只在这里显示一次</text>
+      <view class="new-code" wx:for="{{newCodes}}" wx:key="codeId">
+        <text class="code-value">{{item.code}}</text>
+        <button class="copy-button" data-code="{{item.code}}" bindtap="copyCode">复制</button>
+      </view>
+    </view>
+
+    <view class="history-section">
+      <text class="section-title">历史记录</text>
+      <view wx:if="{{!codes.length}}" class="empty">还没有充值码</view>
+      <view class="code-row" wx:for="{{codes}}" wx:key="codeId">
+        <view class="code-info">
+          <text class="code-hint">{{item.codeHint}}</text>
+          <text class="code-meta">{{item.credits}} 积分 · {{item.statusLabel}}</text>
+        </view>
+        <button
+          wx:if="{{item.status === 'unused'}}"
+          class="disable-button"
+          data-id="{{item.codeId}}"
+          bindtap="disableCode"
+        >停用</button>
+        <text wx:elif="{{item.status === 'redeemed'}}" class="status-text">已兑换</text>
+        <text wx:else class="status-text">已停用</text>
+      </view>
+    </view>
+  </view>
+</view>

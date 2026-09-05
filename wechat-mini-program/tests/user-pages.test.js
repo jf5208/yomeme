@@ -40,6 +40,9 @@ test("结果、积分和说明页文案完整且不暴露模型或支付", () =>
   const all = `${result}\n${credits}\n${guide}`;
 
   assert.match(result, /再次生成将消耗 100 积分/);
+  assert.match(result, /分享链接最长 7 天有效/);
+  assert.match(result, /status === 'reserved'/);
+  assert.match(result, /正在生成/);
   assert.match(credits, /兑换充值码/);
   assert.match(guide, /生成失败，本次未扣积分/);
   assert.match(guide, /单只动物大头/);
@@ -68,11 +71,13 @@ test("上传服务使用固定目录并汇总每张图片进度", async () => {
   delete require.cache[require.resolve(uploadsPath)];
   const { uploadGenerationFiles } = require(uploadsPath);
   const progress = [];
+  const registered = [];
   const pending = uploadGenerationFiles({
     jobId: "job-123456789012",
     templatePath: "/tmp/template.JPEG",
     petPaths: ["/tmp/pet-one.png", "/tmp/pet-two.webp"],
     onProgress: (value) => progress.push(value),
+    onUploaded: async (fileId) => registered.push(fileId),
   });
 
   assert.deepEqual(tasks.map(({ cloudPath }) => cloudPath), [
@@ -94,6 +99,11 @@ test("上传服务使用固定目录并汇总每张图片进度", async () => {
     ],
   });
   assert.equal(progress.at(-1), 100);
+  assert.deepEqual(registered, [
+    "cloud://uploads/job-123456789012/template.jpg",
+    "cloud://uploads/job-123456789012/pet-1.png",
+    "cloud://uploads/job-123456789012/pet-2.webp",
+  ]);
 });
 
 test("结果页所有者加载成功图后准备分享口令", async () => {
@@ -168,6 +178,25 @@ test("分享访问者保持只读且不会申请新的分享口令", async () =>
     jobId: "job-123456789012",
     token: "incoming-token",
   }]);
+});
+
+test("分享口令失效时不误报成生成失败退款", async () => {
+  const page = loadPage("pages/result/index.js", {
+    cloud: {
+      async callFunction() {
+        return { result: { ok: false, code: "forbidden", message: "无权执行这个操作。" } };
+      },
+    },
+    showToast() {},
+  });
+
+  await page.onLoad({ jobId: "job-123456789012", shareToken: "expired-token" });
+
+  assert.equal(page.data.status, "shareUnavailable");
+  const markup = read("pages/result/index.wxml");
+  const start = markup.indexOf("status === 'shareUnavailable'");
+  const block = markup.slice(start, markup.indexOf("<view wx:else", start));
+  assert.doesNotMatch(block, /生成失败，本次未扣积分/);
 });
 
 test("结果页调整会创建新任务并沿用原素材", async () => {

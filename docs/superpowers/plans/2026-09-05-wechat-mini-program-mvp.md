@@ -1,6 +1,6 @@
 # 宠物 Meme 微信小程序 MVP Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 在不改动现有网页和扣子部署的前提下，新增一个原生微信小程序 MVP，提供三次免费体验、Seedream 生图、失败退款、兑换码充值、保存分享和管理员发码。
 
@@ -90,7 +90,7 @@
 - Produces: `validatePetCount(count: number) -> { ok: boolean, message: string }`.
 - Produces: `callApi(action: string, payload?: object) -> Promise<object>`.
 
-- [ ] **Step 1: 写图片规则失败测试**
+- [x] **Step 1: 写图片规则失败测试**
 
 ```js
 const test = require("node:test");
@@ -116,13 +116,13 @@ test("宠物照片必须为 1 到 3 张", () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试并确认因为工具文件不存在而失败**
+- [x] **Step 2: 运行测试并确认因为工具文件不存在而失败**
 
 Run: `cd wechat-mini-program && node --test tests/image-validation.test.js`
 
 Expected: FAIL with `Cannot find module '../miniprogram/utils/image'`.
 
-- [ ] **Step 3: 实现最小图片校验模块**
+- [x] **Step 3: 实现最小图片校验模块**
 
 ```js
 const SUPPORTED_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp"]);
@@ -145,7 +145,7 @@ function validatePetCount(count) {
 module.exports = { isSupportedImage, isSquareImage, validatePetCount };
 ```
 
-- [ ] **Step 4: 建立可被微信开发者工具打开的最小项目**
+- [x] **Step 4: 建立可被微信开发者工具打开的最小项目**
 
 `project.config.json` 使用 `miniprogramRoot: "miniprogram/"`、`cloudfunctionRoot: "cloudfunctions/"`、`appid: "touristappid"`。`app.json` 注册 `pages/create/index` 为首页，并注册 result、credits、guide、admin 四页。`app.js` 仅执行：
 
@@ -174,7 +174,7 @@ async function callApi(action, payload = {}) {
 module.exports = { callApi };
 ```
 
-- [ ] **Step 5: 运行校验测试和 JSON 语法检查**
+- [x] **Step 5: 运行校验测试和 JSON 语法检查**
 
 Run: `cd wechat-mini-program && npm test`
 
@@ -203,7 +203,7 @@ Expected: exit code 0.
 - Produces: page methods `chooseTemplate()`, `choosePets()`, `removePet(event)`, `toggleRights(event)`, `submitGeneration()`.
 - Produces: navigation payload `{ jobId: string }` for the result page.
 
-- [ ] **Step 1: 写创作页结构测试**
+- [x] **Step 1: 写创作页结构测试**
 
 ```js
 const test = require("node:test");
@@ -221,13 +221,13 @@ test("创作页包含两张参考图、1:1 提示和权利确认", () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试并确认创作页尚不存在**
+- [x] **Step 2: 运行测试并确认创作页尚不存在**
 
 Run: `cd wechat-mini-program && node --test tests/create-page.test.js`
 
 Expected: FAIL with `ENOENT` for `pages/create/index.wxml`.
 
-- [ ] **Step 3: 生成并保存两张原创构图示意图**
+- [x] **Step 3: 生成并保存两张原创构图示意图**
 
 使用图像生成工具创建同一套原创视觉，不引用任何现成 Meme、平台水印、角色或文字：
 
@@ -237,7 +237,7 @@ Create two separate square reference images for a Chinese pet meme mini program.
 
 把两张最终采用的正方形 JPG 分别保存为 `front-head.jpg` 与 `half-body.jpg`。`SOURCES.md` 记录生成日期、生成工具和上面的完整提示词。
 
-- [ ] **Step 4: 实现创作页选择与即时拒绝**
+- [x] **Step 4: 实现创作页选择与即时拒绝**
 
 `chooseTemplate()` 使用 `wx.chooseMedia({ count: 1, mediaType: ["image"] })`，随后调用 `wx.getImageInfo`。不为 1:1 时清空模板并调用：
 
@@ -247,11 +247,11 @@ wx.showToast({ title: "请先裁成 1:1，本次不扣积分", icon: "none", dur
 
 `choosePets()` 限制最多三张；卡片中提供删除按钮。生成按钮的 `disabled` 条件必须同时覆盖：无模板、无宠物照片、未勾选权利确认、正在提交。提交时先调用 `prepareGeneration` 取得服务端生成的 `jobId`，再以该编号上传图片，客户端不自行拼接任务编号。
 
-- [ ] **Step 5: 完成轻可爱布局**
+- [x] **Step 5: 完成轻可爱布局**
 
 创作页使用暖白页面背景、珊瑚色主按钮、奶油黄积分入口。参考构图为并排两张小图，不添加失败示例、轮播、下载或点击套用。所有圆角不超过 8px，上传区保持稳定高度，避免选择图片后页面跳动。
 
-- [ ] **Step 6: 运行创作页与全量测试**
+- [x] **Step 6: 运行创作页与全量测试**
 
 Run: `cd wechat-mini-program && npm test`
 
@@ -277,7 +277,7 @@ Expected: all tests PASS.
 - Produces: `refundGeneration({ db, openid, jobId, errorCode, now }) -> Promise<Job>`.
 - Produces: `validateGenerationInput(event) -> { fileIds: string[], adjustment: string }`.
 
-- [ ] **Step 1: 写体验积分、扣费、退款和幂等测试**
+- [x] **Step 1: 写体验积分、扣费、退款和幂等测试**
 
 ```js
 test("新用户只领取一次 300 积分", async () => {
@@ -308,13 +308,13 @@ test("生成失败只退款一次", async () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试并确认积分模块不存在**
+- [x] **Step 2: 运行测试并确认积分模块不存在**
 
 Run: `cd wechat-mini-program && node --test tests/credits.test.js`
 
 Expected: FAIL with `Cannot find module`.
 
-- [ ] **Step 3: 实现事务内的积分与任务状态更新**
+- [x] **Step 3: 实现事务内的积分与任务状态更新**
 
 用户文档固定使用 `_id = openid`，生成任务固定使用 `_id = jobId`。所有余额变化与 `credit_events` 写入必须放在同一 `db.runTransaction()` 中。外部 Seedream 请求绝不能放进数据库事务。
 
@@ -330,11 +330,11 @@ const ALLOWED_TRANSITIONS = {
 
 重复 `reserve` 返回 `{ job: 已有任务, acquired: false }`；首次预占返回 `{ job: 新任务, acquired: true }`。重复 `complete` 或 `refund` 返回已完成任务，不再次改余额。余额小于 100 时抛出业务错误 `insufficient_credits`。
 
-- [ ] **Step 4: 实现服务端输入校验**
+- [x] **Step 4: 实现服务端输入校验**
 
 `validateGenerationInput()` 必须验证：`jobId` 为 16 到 64 位字母数字与连字符；`templateFileId` 为非空云文件 ID；`petFileIds` 为 1 到 3 个非空云文件 ID；`templateWidth === templateHeight`；`rightsConfirmed === true`；调整意见最多 300 字。
 
-- [ ] **Step 5: 运行积分测试**
+- [x] **Step 5: 运行积分测试**
 
 Run: `cd wechat-mini-program && npm test`
 
@@ -357,7 +357,7 @@ Expected: all tests PASS.
 - Produces: `disableCode({ db, adminOpenid, codeId, now }) -> Promise<CodeSummary>`.
 - Consumes: `ADMIN_OPENIDS` from cloud function environment, comma-separated.
 
-- [ ] **Step 1: 写一次兑换、重复兑换和非管理员拒绝测试**
+- [x] **Step 1: 写一次兑换、重复兑换和非管理员拒绝测试**
 
 ```js
 test("1000 积分兑换码只能兑换一次", async () => {
@@ -378,21 +378,21 @@ test("非管理员不能创建兑换码", async () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试并确认兑换码模块不存在**
+- [x] **Step 2: 运行测试并确认兑换码模块不存在**
 
 Run: `cd wechat-mini-program && node --test tests/codes.test.js`
 
 Expected: FAIL with `Cannot find module`.
 
-- [ ] **Step 3: 实现兑换码哈希与一次性兑换事务**
+- [x] **Step 3: 实现兑换码哈希与一次性兑换事务**
 
 兑换码使用 `crypto.randomBytes(12).toString("base64url")` 生成，数据库只保存 `sha256` 哈希和前后四位提示。兑换事务读取固定哈希文档，确认 `status === "unused"` 后同时更新兑换码、用户余额与积分流水。重复云函数调用不能重复充值。
 
-- [ ] **Step 4: 实现管理员身份校验**
+- [x] **Step 4: 实现管理员身份校验**
 
 `ADMIN_OPENIDS` 解析为非空集合。创建数量限制 1 到 50，积分限制为 100 的正整数倍且不超过 10000。新兑换码明文只在创建响应中出现一次；列表接口只返回提示、积分、状态和兑换时间。
 
-- [ ] **Step 5: 运行兑换码和全量测试**
+- [x] **Step 5: 运行兑换码和全量测试**
 
 Run: `cd wechat-mini-program && npm test`
 
@@ -413,7 +413,7 @@ Expected: all tests PASS.
 - Produces: `generateImage({ apiKey, model, images, adjustment, fetchImpl }) -> Promise<{ bytes: Buffer, mimeType: string }>`.
 - Consumes: `images = [{ bytes: Buffer, mimeType: string }]`, with template first and 1 to 3 pet photos following.
 
-- [ ] **Step 1: 写提示词保留约束测试**
+- [x] **Step 1: 写提示词保留约束测试**
 
 ```js
 test("提示词要求只替换动物并保持正方形", () => {
@@ -426,25 +426,25 @@ test("提示词要求只替换动物并保持正方形", () => {
 });
 ```
 
-- [ ] **Step 2: 写 Seedream 请求与错误归一化测试**
+- [x] **Step 2: 写 Seedream 请求与错误归一化测试**
 
 Mock `fetchImpl`，断言请求发送到 `https://ark.cn-beijing.volces.com/api/v3/images/generations`，固定 `size: "2048x2048"`、`response_format: "b64_json"`、`watermark: false`，并从第一条 `b64_json` 返回 Buffer。400 响应必须转成不包含 API Key 的 `provider_rejected` 业务错误。
 
-- [ ] **Step 3: 运行测试并确认模块不存在**
+- [x] **Step 3: 运行测试并确认模块不存在**
 
 Run: `cd wechat-mini-program && node --test tests/prompt.test.js tests/seedream.test.js`
 
 Expected: FAIL with `Cannot find module`.
 
-- [ ] **Step 4: 移植现有稳定提示词并固定 1:1 输出**
+- [x] **Step 4: 移植现有稳定提示词并固定 1:1 输出**
 
 从 `pet_meme/prompts.py` 移植“保留文字、构图、动作、表情、背景、模糊和网图质感，只替换单个动物主体”的英文约束。移除自动去水印要求，并新增 `output a square 1:1 image`。调整意见为空时不追加调整段落。
 
-- [ ] **Step 5: 实现 Seedream 请求解析**
+- [x] **Step 5: 实现 Seedream 请求解析**
 
 默认模型读取 `SEEDREAM_MODEL`，缺省值为 `doubao-seedream-4-5-251128`。API Key 读取 `ARK_API_KEY`。请求超时 180 秒；对超时、内容审核、余额不足、模型未开通和未知错误映射为简短中文提示，日志只写业务错误码和云函数 RequestId。
 
-- [ ] **Step 6: 运行模型模块测试**
+- [x] **Step 6: 运行模型模块测试**
 
 Run: `cd wechat-mini-program && npm test`
 
@@ -468,7 +468,7 @@ Expected: all tests PASS.
 - Produces cloud actions: `bootstrap`, `prepareGeneration`, `generate`, `getResult`, `prepareShare`, `redeem`, `adminCreateCodes`, `adminListCodes`, `adminDisableCode`, `recoverStaleJobs`.
 - Produces response envelope `{ ok: true, data }` or `{ ok: false, code, message }`.
 
-- [ ] **Step 1: 写身份不可伪造和 action 白名单测试**
+- [x] **Step 1: 写身份不可伪造和 action 白名单测试**
 
 ```js
 test("使用 getWXContext 的 OPENID 而不是 event.openid", async () => {
@@ -483,33 +483,33 @@ test("未知 action 被拒绝", async () => {
 });
 ```
 
-- [ ] **Step 2: 写生成成功、失败退款和重复请求测试**
+- [x] **Step 2: 写生成成功、失败退款和重复请求测试**
 
 成功路径断言余额从 300 变为 200、任务为 `succeeded`、结果文件被保存。失败路径断言余额回到 300、任务为 `failed`。相同 `jobId` 再次调用时不重复请求 Seedream，也不重复扣积分。
 
-- [ ] **Step 3: 运行测试并确认云函数入口尚不存在**
+- [x] **Step 3: 运行测试并确认云函数入口尚不存在**
 
 Run: `cd wechat-mini-program && node --test tests/api-dispatch.test.js tests/generation-flow.test.js`
 
 Expected: FAIL with `Cannot find module`.
 
-- [ ] **Step 4: 实现生成顺序**
+- [x] **Step 4: 实现生成顺序**
 
 `prepareGeneration` 使用 `crypto.randomUUID()` 产生 `jobId`，在 `generation_preparations` 写入当前 OpenID、云环境和 10 分钟有效期，不预占积分。`generate` 先按 `jobId` 查询已有任务并直接返回原状态，确保准备凭证过期后的同任务重试仍然幂等；新任务才校验准备凭证、上传目录、真实图片解码和积分预占。若 `acquired === false`，不执行任何外部工作；只有 `acquired === true` 才继续调用 Seedream、上传按真实 MIME 命名的结果文件并完成任务。任何下载、模型或上传异常都调用幂等退款，然后返回“生成失败，本次未扣积分”。
 
-- [ ] **Step 5: 实现超时恢复**
+- [x] **Step 5: 实现超时恢复**
 
 `recoverStaleJobs` 只允许管理员调用。扫描十分钟前仍为 `reserved` 的任务，逐个调用幂等退款。`bootstrap` 只检查当前用户的过期任务并退款，不扫描全库。
 
-- [ ] **Step 6: 实现只读分享口令**
+- [x] **Step 6: 实现只读分享口令**
 
 结果默认只允许任务所属 OpenID 查询。`prepareShare` 仅允许任务所属用户调用，使用 `crypto.randomBytes(18)` 生成分享口令，数据库只保存口令哈希；明文返回给结果页用于分享路径。`getResult` 对所属用户不要求口令，对其他用户必须同时提供正确的 `jobId` 和分享口令，并且只返回结果图片临时地址、生成时间和只读标记，绝不返回模板或宠物照片文件 ID。
 
-- [ ] **Step 7: 实现响应脱敏**
+- [x] **Step 7: 实现响应脱敏**
 
 `index.js` 捕获业务错误后只返回白名单中文提示。未知异常记录 `requestId`、action 和错误码，不记录 `event` 全量内容、文件内容、兑换码明文或环境变量。
 
-- [ ] **Step 8: 运行云函数与全量测试**
+- [x] **Step 8: 运行云函数与全量测试**
 
 Run: `cd wechat-mini-program && npm test`
 
@@ -540,33 +540,33 @@ Expected: all tests PASS.
 - Consumes cloud actions `prepareGeneration`, `generate`, `getResult`, `prepareShare`, `redeem`, `bootstrap`.
 - Result page consumes query `jobId` and optional `shareToken` and exposes `saveImage()`, `submitAdjustment()`, `onShareAppMessage()`.
 
-- [ ] **Step 1: 写页面文案与模型隐藏测试**
+- [x] **Step 1: 写页面文案与模型隐藏测试**
 
 读取 result、credits、guide 三页 WXML，断言包含“再次生成将消耗 100 积分”“兑换充值码”“生成失败，本次未扣积分”和“单只动物大头”；断言所有用户页面不包含 `Seedream`、`Gemini`、`API Key`、`微信支付` 或“购买套餐”。
 
-- [ ] **Step 2: 运行测试并确认页面不存在**
+- [x] **Step 2: 运行测试并确认页面不存在**
 
 Run: `cd wechat-mini-program && node --test tests/user-pages.test.js`
 
 Expected: FAIL with `ENOENT`.
 
-- [ ] **Step 3: 实现有进度的云存储上传**
+- [x] **Step 3: 实现有进度的云存储上传**
 
 创作页先调用 `prepareGeneration` 取得服务端 `jobId`。模板路径使用 `uploads/{jobId}/template.{ext}`，宠物图使用 `uploads/{jobId}/pet-{index}.{ext}`。每个 `wx.cloud.uploadFile()` 的上传任务监听 `onProgressUpdate`，创作页显示总体上传百分比。上传任何一张失败时不调用 `generate`。
 
-- [ ] **Step 4: 实现结果保存与分享**
+- [x] **Step 4: 实现结果保存与分享**
 
 结果页通过 `getResult` 取得由云函数签发的短期地址，保存时先 `wx.downloadFile`，再调用 `wx.saveImageToPhotosAlbum`。首次拒绝相册权限时显示引导，但不自动打开设置。所属用户加载结果后调用一次 `prepareShare` 并将明文口令只保存在页面内存；分享按钮在口令准备好后才可用。`onShareAppMessage()` 返回结果页路径 `pages/result/index?jobId=...&shareToken=...`，并使用生成图临时地址作为分享卡片封面。分享访问者只获得只读结果，不显示调整输入框，也不能看到原始模板或宠物文件 ID。
 
-- [ ] **Step 5: 实现一次调整再生成**
+- [x] **Step 5: 实现一次调整再生成**
 
 结果页只在首次结果成功后显示调整输入框，最多 300 字。按钮旁明确标注消耗 100 积分。新请求生成新的 `jobId`，并携带 `sourceJobId`，后端读取原任务的模板与宠物文件 ID；生成成功后替换当前结果，失败保留旧结果。
 
-- [ ] **Step 6: 实现积分兑换与说明页**
+- [x] **Step 6: 实现积分兑换与说明页**
 
 积分页输入兑换码后调用 `redeem`，成功立即刷新余额和兑换记录。页面不出现价格与购买按钮。说明页压缩现有 `docs/user-guide.md` 内容，保留模板、宠物照片、调整意见、积分退款和素材授权五部分。
 
-- [ ] **Step 7: 运行用户页面和全量测试**
+- [x] **Step 7: 运行用户页面和全量测试**
 
 Run: `cd wechat-mini-program && npm test`
 
@@ -593,21 +593,21 @@ Expected: all tests PASS.
 - Consumes cloud actions `adminCreateCodes`, `adminListCodes`, `adminDisableCode`.
 - Produces page methods `createCodes()`, `copyCode(event)`, `disableCode(event)`.
 
-- [ ] **Step 1: 写管理员页面安全文案测试**
+- [x] **Step 1: 写管理员页面安全文案测试**
 
 断言管理员页面支持 1 到 50 个批量发码、默认 1000 积分、新码一次复制、已兑换状态和停用；断言页面不要求或保存管理员密码。云函数测试必须覆盖非管理员 OpenID 收到 `forbidden`。
 
-- [ ] **Step 2: 运行测试并确认管理员页面不存在**
+- [x] **Step 2: 运行测试并确认管理员页面不存在**
 
 Run: `cd wechat-mini-program && node --test tests/admin-page.test.js`
 
 Expected: FAIL with `ENOENT`.
 
-- [ ] **Step 3: 实现隐藏管理员入口**
+- [x] **Step 3: 实现隐藏管理员入口**
 
 普通导航和使用说明中不显示管理员入口。管理员通过直接打开 `pages/admin/index` 访问；页面加载时先调用 `adminListCodes`，收到 `forbidden` 后显示“此页面仅限管理员使用”且不展示表单。
 
-- [ ] **Step 4: 更新仓库忽略规则**
+- [x] **Step 4: 更新仓库忽略规则**
 
 追加以下规则，不删除现有规则：
 
@@ -620,15 +620,15 @@ wechat-mini-program/miniprogram/uploads/
 wechat-mini-program/miniprogram/temp/
 ```
 
-- [ ] **Step 5: 写非技术部署说明**
+- [x] **Step 5: 写非技术部署说明**
 
-`cloudbase-setup.md` 按界面操作顺序说明：微信开发者工具导入项目、替换真实 AppID、开通云开发环境、创建 `users`、`generation_jobs`、`generation_preparations`、`credit_events`、`redemption_codes`、`share_grants` 六个集合并全部设置“仅管理端可读写”；为 `generation_jobs` 建立 `status + reservationExpiresAt + _id` 复合索引和 `_openid + status + reservationExpiresAt + _id` 复合索引，为 `redemption_codes` 建立 `createdAt + _id` 复合索引；将云存储设置为仅创建者可读写；部署 `petMemeApi`，将运行时设置为 Node.js 20.19、超时设置为 300 秒，并配置 `ARK_API_KEY`、`SEEDREAM_MODEL` 和 `ADMIN_OPENIDS`。说明 `generation_preparations` 和 `share_grants` 的过期记录清理方式，以及上传云函数、预览与真机调试。明确不要把密钥粘进小程序代码或截图。
+`cloudbase-setup.md` 按界面操作顺序说明：微信开发者工具导入项目、替换真实 AppID、开通云开发环境、创建 `users`、`generation_jobs`、`generation_preparations`、`credit_events`、`redemption_codes`、`share_grants` 六个集合并全部设置“仅管理端可读写”；为 `generation_jobs` 建立 `status + reservationExpiresAt + _id` 复合索引和 `_openid + status + reservationExpiresAt + _id` 复合索引，为 `redemption_codes` 建立 `createdAt + _id` 复合索引；将云存储设置为仅创建者可读写，并为 `uploads/` 与 `results/` 配置生命周期兜底；部署 `petMemeApi`，将运行时设置为 Node.js 20.19、超时设置为 300 秒，并配置 `ARK_API_KEY`、`SEEDREAM_MODEL` 和 `ADMIN_OPENIDS`。说明 `generation_preparations` 和 `share_grants` 的过期记录清理方式，以及上传云函数、预览与真机调试。明确不要把密钥粘进小程序代码或截图。
 
-- [ ] **Step 6: 实现每日隐私清理函数**
+- [x] **Step 6: 实现每日隐私清理函数**
 
-`petMemeMaintenance` 使用服务端 SDK 查询已完成任务：删除创建超过 7 天的模板与宠物原图并清空对应文件 ID；删除创建超过 30 天的生成结果并把任务标记为 `expired`。删除必须幂等，单次最多处理 100 个任务。`maintenance.test.js` 覆盖 6 天不删除、8 天只删原图、31 天删除全部文件、重复运行不报错。部署说明要求为该函数配置每天凌晨执行一次的定时触发器。
+`petMemeMaintenance` 使用服务端 SDK 先幂等退款到期后仍为 `reserved` 的任务并释放源任务调整名额，再查询已完成任务：删除创建超过 7 天且没有正在调整的模板与宠物原图并清空对应文件 ID；删除创建超过 30 天的生成结果并把任务标记为 `expired`；同时重试删除结算失败后记录的孤立结果。清理与调整通过任务上的 `cleanupClaimed` 事务字段互斥，消除查询后才开始调整的并发窗口。删除必须幂等，兼容 wx-server-sdk 的 `-503003` 文件不存在返回，单次最多恢复 100 个预占任务、处理 100 个清理任务。`maintenance.test.js` 覆盖 6 天不删除、8 天只删原图、31 天删除全部文件、过期预占退款、调整与清理并发、孤立文件重试和重复运行不报错。部署说明要求为该函数配置每天凌晨执行一次的定时触发器。
 
-- [ ] **Step 7: 完成静态安全检查**
+- [x] **Step 7: 完成静态安全检查**
 
 Run: `cd wechat-mini-program && rg -n "ARK_API_KEY=|ark-[A-Za-z0-9_-]{12,}|ADMIN_OPENIDS=" miniprogram tests README.md docs || true`
 
@@ -638,7 +638,7 @@ Run: `cd wechat-mini-program && rg -n "Seedream|Gemini|API Key|微信支付|购�
 
 Expected: no output from user-facing pages. The hidden admin page may mention neither provider nor payment.
 
-- [ ] **Step 8: 运行完整自动测试**
+- [x] **Step 8: 运行完整自动测试**
 
 Run: `cd wechat-mini-program && npm test`
 

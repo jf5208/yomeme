@@ -1,4 +1,5 @@
 const crypto = require("node:crypto");
+const { SHARE_GRANT_TTL_MS, RESULT_RETENTION_MS } = require("../config");
 
 function businessError(code, message) {
   return Object.assign(new Error(message), { code });
@@ -18,12 +19,20 @@ function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-async function validShareGrant(db, jobId, token) {
+async function validShareGrant(db, jobId, token, now) {
   if (typeof token !== "string" || token.length === 0) return false;
   const tokenHash = hashToken(token);
   const result = await db.collection("share_grants").doc(tokenHash).get();
   const grant = result.data || null;
-  return Boolean(grant && grant.jobId === jobId);
+  const current = now === undefined ? new Date() : new Date(now);
+  const expiresAt = grant && new Date(grant.expiresAt);
+  return Boolean(
+    grant
+    && grant.jobId === jobId
+    && !Number.isNaN(current.getTime())
+    && !Number.isNaN(expiresAt.getTime())
+    && expiresAt.getTime() > current.getTime()
+  );
 }
 
 function isoString(value) {
@@ -41,11 +50,11 @@ async function temporaryUrl(cloud, fileId) {
   return file.tempFileURL;
 }
 
-async function getResult({ db, cloud, openid, jobId, token }) {
+async function getResult({ db, cloud, openid, jobId, token, now }) {
   const job = await getJob(db, null, jobId);
   requireJob(job);
   const isOwner = job._openid === openid;
-  if (!isOwner && !(await validShareGrant(db, jobId, token))) {
+  if (!isOwner && !(await validShareGrant(db, jobId, token, now))) {
     throw businessError("forbidden", "无权访问这个生成结果。");
   }
   if (!isOwner && job.status !== "succeeded") {
@@ -65,6 +74,11 @@ async function getResult({ db, cloud, openid, jobId, token }) {
   if (isOwner) {
     response.canAdjust = job.status === "succeeded"
       && !job.isRegeneration
+      && job.originalsCleaned !== true
+      && !job.cleanupClaimed
+      && typeof job.templateFileId === "string"
+      && Array.isArray(job.petFileIds)
+      && job.petFileIds.length > 0
       && !job.adjustmentReservedJobId
       && !job.adjustmentSucceededJobId;
   }
@@ -91,12 +105,20 @@ async function prepareShare({
     if (job.status !== "succeeded" || !job.resultFileId) {
       throw businessError("result_not_ready", "生成结果尚未完成。");
     }
+    const resultExpiresAt = new Date(new Date(job.createdAt).getTime() + RESULT_RETENTION_MS);
+    if (Number.isNaN(resultExpiresAt.getTime()) || resultExpiresAt <= sharedAt) {
+      throw businessError("result_unavailable", "生成结果已过保存期。");
+    }
     await transaction.collection("share_grants").doc(tokenHash).set({
       data: {
         tokenHash,
         jobId,
         _openid: openid,
         createdAt: sharedAt,
+        expiresAt: new Date(Math.min(
+          sharedAt.getTime() + SHARE_GRANT_TTL_MS,
+          resultExpiresAt.getTime(),
+        )),
       },
     });
   });

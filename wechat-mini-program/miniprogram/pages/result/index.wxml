@@ -23,6 +23,7 @@
         disabled="{{!shareToken}}"
       >分享给朋友</button>
     </view>
+    <text wx:if="{{!readOnly}}" class="share-note">分享链接最长 7 天有效。</text>
 
     <view wx:if="{{readOnly}}" class="read-only-note">这是朋友分享的作品，仅供查看与保存。</view>
 
@@ -44,6 +45,24 @@
       >按意见再生成一次</button>
     </view>
     <view wx:else class="read-only-note">这张作品的一次调整机会已经使用。</view>
+  </view>
+
+  <view wx:elif="{{status === 'reserved'}}" class="state-panel">
+    <text class="state-title">正在生成</text>
+    <text class="state-copy">作品还在准备中，可以稍后返回这个页面查看。</text>
+    <navigator class="primary-link" url="/pages/create/index" open-type="reLaunch">先回创作页</navigator>
+  </view>
+
+  <view wx:elif="{{status === 'expired'}}" class="state-panel">
+    <text class="state-title">作品已过保存期</text>
+    <text class="state-copy">生成结果会保留 30 天，之后自动清理。下次记得及时保存到相册。</text>
+    <navigator class="primary-link" url="/pages/create/index" open-type="reLaunch">重新做一张</navigator>
+  </view>
+
+  <view wx:elif="{{status === 'shareUnavailable'}}" class="state-panel">
+    <text class="state-title">这个分享已失效</text>
+    <text class="state-copy">分享链接可能已过期，或作品已经超过保存期。</text>
+    <navigator class="primary-link" url="/pages/create/index" open-type="reLaunch">做一张自己的</navigator>
   </view>
 
   <view wx:else class="state-panel">
