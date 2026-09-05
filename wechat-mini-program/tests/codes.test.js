@@ -39,7 +39,11 @@ function createMemoryDb() {
     const rows = transactionState[name];
     if (!rows) throw new Error(`Unknown collection: ${name}`);
 
-    return {
+    let orderings = [];
+    let offset = 0;
+    let pageSize = Infinity;
+
+    const collection = {
       doc(id) {
         return {
           async get() {
@@ -65,10 +69,34 @@ function createMemoryDb() {
           },
         };
       },
+      orderBy(field, direction) {
+        orderings.push({ field, direction });
+        return collection;
+      },
+      skip(value) {
+        offset = value;
+        return collection;
+      },
+      limit(value) {
+        pageSize = value;
+        return collection;
+      },
       async get() {
-        return { data: Object.values(rows).map(clone) };
+        const data = Object.values(rows).map(clone);
+        data.sort((left, right) => {
+          for (const { field, direction } of orderings) {
+            const leftValue = left[field] instanceof Date ? left[field].getTime() : left[field];
+            const rightValue = right[field] instanceof Date ? right[field].getTime() : right[field];
+            if (leftValue === rightValue) continue;
+            const comparison = leftValue < rightValue ? -1 : 1;
+            return direction === "desc" ? -comparison : comparison;
+          }
+          return 0;
+        });
+        return { data: data.slice(offset, offset + pageSize) };
       },
     };
+    return collection;
   }
 
   const db = {
@@ -110,6 +138,72 @@ function createMemoryDb() {
   });
 
   return db;
+}
+
+function codeIdFor(index) {
+  return index.toString(16).padStart(64, "0");
+}
+
+function createPagedListDb() {
+  const documents = [];
+  for (let index = 204; index >= 0; index -= 1) {
+    const codeId = codeIdFor(index);
+    documents.push({
+      _id: codeId,
+      codeHash: codeId,
+      codeHint: `C${String(index).padStart(3, "0")}...SAFE`,
+      codePlaintext: `SECRET-${index}`,
+      credits: 1000,
+      status: index % 2 === 0 ? "unused" : "redeemed",
+      redeemedBy: index % 2 === 0 ? null : `user-${index}`,
+      redeemedAt: index % 2 === 0 ? null : NEXT,
+      createdBy: "owner",
+      createdAt: index >= 100 ? NEXT : NOW,
+    });
+  }
+
+  const calls = [];
+  return {
+    calls,
+    collection(name) {
+      assert.equal(name, "redemption_codes");
+      let orderings = [];
+      let offset = 0;
+      let requestedLimit;
+      const query = {
+        orderBy(field, direction) {
+          orderings.push({ field, direction });
+          return query;
+        },
+        skip(value) {
+          offset = value;
+          return query;
+        },
+        limit(value) {
+          requestedLimit = value;
+          return query;
+        },
+        async get() {
+          const servicePageLimit = 100;
+          const effectiveLimit = Math.min(requestedLimit || servicePageLimit, servicePageLimit);
+          const sorted = documents.slice();
+          sorted.sort((left, right) => {
+            for (const { field, direction } of orderings) {
+              const leftValue = left[field] instanceof Date ? left[field].getTime() : left[field];
+              const rightValue = right[field] instanceof Date ? right[field].getTime() : right[field];
+              if (leftValue === rightValue) continue;
+              const comparison = leftValue < rightValue ? -1 : 1;
+              return direction === "desc" ? -comparison : comparison;
+            }
+            return 0;
+          });
+          calls.push({ orderings: clone(orderings), offset, limit: requestedLimit });
+          return { data: sorted.slice(offset, offset + effectiveLimit).map(clone) };
+        },
+      };
+      return query;
+    },
+  };
 }
 
 function fixedRandomBytes() {
@@ -350,6 +444,53 @@ test("列表只返回管理所需字段且永不包含兑换码明文", async ()
   assert.equal(JSON.stringify(summaries).includes("codeHash"), false);
   assert.equal(JSON.stringify(summaries).includes("redeemedBy"), false);
   assert.equal(JSON.stringify(summaries).includes("createdBy"), false);
+});
+
+test("列表分页读取超过 100 个兑换码并保持确定顺序和安全字段", async () => {
+  const db = createPagedListDb();
+
+  const summaries = await listCodes({ db, adminOpenid: "owner" });
+
+  const expectedIds = [
+    ...Array.from({ length: 105 }, (_, index) => codeIdFor(index + 100)),
+    ...Array.from({ length: 100 }, (_, index) => codeIdFor(index)),
+  ];
+  assert.equal(summaries.length, 205);
+  assert.deepEqual(summaries.map(({ codeId }) => codeId), expectedIds);
+  assert.equal(new Set(summaries.map(({ codeId }) => codeId)).size, 205);
+  assert.deepEqual(db.calls, [
+    {
+      orderings: [
+        { field: "createdAt", direction: "desc" },
+        { field: "_id", direction: "asc" },
+      ],
+      offset: 0,
+      limit: 100,
+    },
+    {
+      orderings: [
+        { field: "createdAt", direction: "desc" },
+        { field: "_id", direction: "asc" },
+      ],
+      offset: 100,
+      limit: 100,
+    },
+    {
+      orderings: [
+        { field: "createdAt", direction: "desc" },
+        { field: "_id", direction: "asc" },
+      ],
+      offset: 200,
+      limit: 100,
+    },
+  ]);
+  for (const summary of summaries) {
+    assert.deepEqual(
+      Object.keys(summary).sort(),
+      ["codeHint", "codeId", "credits", "redeemedAt", "status"],
+    );
+  }
+  assert.equal(JSON.stringify(summaries).includes("SECRET-"), false);
 });
 
 test("未使用兑换码可停用且重复停用保持幂等，已兑换码不可停用", async () => {

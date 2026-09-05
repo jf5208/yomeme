@@ -1,6 +1,8 @@
 const crypto = require("node:crypto");
 const { TRIAL_CREDITS } = require("../config");
 
+const CODE_LIST_PAGE_SIZE = 100;
+
 function businessError(code, message) {
   return Object.assign(new Error(message), { code });
 }
@@ -219,14 +221,24 @@ async function redeemCode({ db, openid, plaintextCode, now }) {
 
 async function listCodes({ db, adminOpenid }) {
   requireAdmin(adminOpenid);
-  const result = await db.collection("redemption_codes").get();
-  return result.data
-    .slice()
-    .sort((left, right) => {
-      const dateDifference = new Date(right.createdAt) - new Date(left.createdAt);
-      return dateDifference || left._id.localeCompare(right._id);
-    })
-    .map(codeSummary);
+  const documents = [];
+  let offset = 0;
+
+  while (true) {
+    const result = await db
+      .collection("redemption_codes")
+      .orderBy("createdAt", "desc")
+      .orderBy("_id", "asc")
+      .skip(offset)
+      .limit(CODE_LIST_PAGE_SIZE)
+      .get();
+    const page = result.data || [];
+    documents.push(...page);
+    if (page.length < CODE_LIST_PAGE_SIZE) break;
+    offset += page.length;
+  }
+
+  return documents.map(codeSummary);
 }
 
 async function disableCode({ db, adminOpenid, codeId, now }) {
