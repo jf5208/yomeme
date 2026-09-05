@@ -1,0 +1,9 @@
+const TRIAL_CREDITS = 300;
+const GENERATION_COST = 100;
+const RESERVATION_TTL_MS = 10 * 60 * 1000;
+
+module.exports = {
+  TRIAL_CREDITS,
+  GENERATION_COST,
+  RESERVATION_TTL_MS,
+};
