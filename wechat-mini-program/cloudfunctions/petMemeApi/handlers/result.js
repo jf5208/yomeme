@@ -18,11 +18,18 @@ function hashToken(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-function tokenMatches(token, expectedHash) {
-  if (typeof token !== "string" || typeof expectedHash !== "string") return false;
-  const actual = Buffer.from(hashToken(token), "hex");
-  const expected = Buffer.from(expectedHash, "hex");
-  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+async function validShareGrant(db, jobId, token) {
+  if (typeof token !== "string" || token.length === 0) return false;
+  const tokenHash = hashToken(token);
+  const result = await db.collection("share_grants").doc(tokenHash).get();
+  const grant = result.data || null;
+  return Boolean(grant && grant.jobId === jobId);
+}
+
+function isoString(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 async function temporaryUrl(cloud, fileId) {
@@ -38,7 +45,7 @@ async function getResult({ db, cloud, openid, jobId, token }) {
   const job = await getJob(db, null, jobId);
   requireJob(job);
   const isOwner = job._openid === openid;
-  if (!isOwner && !tokenMatches(token, job.shareTokenHash)) {
+  if (!isOwner && !(await validShareGrant(db, jobId, token))) {
     throw businessError("forbidden", "无权访问这个生成结果。");
   }
   if (!isOwner && job.status !== "succeeded") {
@@ -52,7 +59,7 @@ async function getResult({ db, cloud, openid, jobId, token }) {
     jobId: job.jobId,
     status: job.status,
     imageUrl,
-    generatedAt: job.completedAt || null,
+    generatedAt: isoString(job.completedAt),
     readOnly: !isOwner,
   };
 }
@@ -65,7 +72,7 @@ async function prepareShare({
   now,
 }) {
   const token = randomBytes(18).toString("base64url");
-  const shareTokenHash = hashToken(token);
+  const tokenHash = hashToken(token);
   const sharedAt = now === undefined ? new Date() : new Date(now);
 
   await db.runTransaction(async (transaction) => {
@@ -77,8 +84,13 @@ async function prepareShare({
     if (job.status !== "succeeded" || !job.resultFileId) {
       throw businessError("result_not_ready", "生成结果尚未完成。");
     }
-    await transaction.collection("generation_jobs").doc(jobId).update({
-      data: { shareTokenHash, sharedAt },
+    await transaction.collection("share_grants").doc(tokenHash).set({
+      data: {
+        tokenHash,
+        jobId,
+        _openid: openid,
+        createdAt: sharedAt,
+      },
     });
   });
 

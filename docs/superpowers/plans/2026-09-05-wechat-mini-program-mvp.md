@@ -6,7 +6,7 @@
 
 **Architecture:** 在 `wechat-mini-program` 独立目录中实现原生微信小程序，并通过一个事件型 CloudBase 云函数 `petMemeApi` 访问用户、积分、兑换码、生成任务和云存储。客户端只负责选择图片、1:1 校验、展示与微信原生保存分享；所有身份、积分、管理员权限和 Seedream 调用都由云函数处理。
 
-**Tech Stack:** 微信原生小程序、微信云开发 `wx.cloud`、Node.js 18.15、`wx-server-sdk@3.0.1`、Node 内置测试框架、Seedream 图片生成 API。
+**Tech Stack:** 微信原生小程序、微信云开发 `wx.cloud`、Node.js 20.19、`wx-server-sdk@4.0.2`、`sharp@0.35.4`、Node 内置测试框架、Seedream 图片生成 API。
 
 **Spec:** `docs/superpowers/specs/2026-09-05-wechat-mini-program-mvp-design.md`
 
@@ -21,6 +21,7 @@
 - 现有网页、扣子部署、Python 代码和本地运行数据均不迁移、不覆盖。
 - `ARK_API_KEY` 只存在于云函数环境变量，客户端、日志、数据库和仓库都不能包含密钥。
 - 所有数据库集合设置为“仅管理端可读写”，小程序必须通过云函数访问。
+- 云存储设置为“仅创建者可读写”，分享时只由云函数签发短期临时地址，不公开原图目录。
 - 当前工作目录不是 Git 仓库，因此每个任务以自动测试和文件检查作为检查点，不执行提交命令。
 
 ## File Structure
@@ -51,7 +52,7 @@
 - Create `wechat-mini-program/cloudfunctions/petMemeApi/handlers/redeem.js`: 兑换码充值。
 - Create `wechat-mini-program/cloudfunctions/petMemeApi/handlers/admin.js`: 管理员发码、列表与停用。
 - Create `wechat-mini-program/cloudfunctions/petMemeApi/handlers/recover.js`: 过期预占积分退款。
-- Create `wechat-mini-program/cloudfunctions/petMemeApi/package.json`: 固定 `wx-server-sdk@3.0.1`。
+- Create `wechat-mini-program/cloudfunctions/petMemeApi/package.json`: 固定 `wx-server-sdk@4.0.2` 与 `sharp@0.35.4`。
 - Create `wechat-mini-program/cloudfunctions/petMemeMaintenance/index.js`: 定时清理过期上传原图和生成结果。
 - Create `wechat-mini-program/cloudfunctions/petMemeMaintenance/package.json`: 维护函数依赖。
 - Create `wechat-mini-program/tests/image-validation.test.js`: 图片类型、比例和数量测试。
@@ -494,7 +495,7 @@ Expected: FAIL with `Cannot find module`.
 
 - [ ] **Step 4: 实现生成顺序**
 
-`prepareGeneration` 使用 `crypto.randomUUID()` 产生 `jobId` 并返回给当前用户，不预占积分。`generate` 严格按以下顺序执行：服务端校验、积分预占；若 `acquired === false`，直接返回已有任务，不执行任何外部工作；只有 `acquired === true` 才继续下载模板与宠物照片、调用 Seedream、上传 `results/{openid}/{jobId}.png`、完成任务。任何下载、模型或上传异常都调用 `refundGeneration()`，然后返回“生成失败，本次未扣积分”。
+`prepareGeneration` 使用 `crypto.randomUUID()` 产生 `jobId`，在 `generation_preparations` 写入当前 OpenID、云环境和 10 分钟有效期，不预占积分。`generate` 先按 `jobId` 查询已有任务并直接返回原状态，确保准备凭证过期后的同任务重试仍然幂等；新任务才校验准备凭证、上传目录、真实图片解码和积分预占。若 `acquired === false`，不执行任何外部工作；只有 `acquired === true` 才继续调用 Seedream、上传按真实 MIME 命名的结果文件并完成任务。任何下载、模型或上传异常都调用幂等退款，然后返回“生成失败，本次未扣积分”。
 
 - [ ] **Step 5: 实现超时恢复**
 
@@ -621,7 +622,7 @@ wechat-mini-program/miniprogram/temp/
 
 - [ ] **Step 5: 写非技术部署说明**
 
-`cloudbase-setup.md` 按界面操作顺序说明：微信开发者工具导入项目、替换真实 AppID、开通云开发环境、创建四个集合、全部设置“仅管理端可读写”、部署 `petMemeApi`、将超时设置为 300 秒、配置 `ARK_API_KEY`、`SEEDREAM_MODEL` 和 `ADMIN_OPENIDS`、上传云函数、预览与真机调试。明确不要把密钥粘进小程序代码或截图。
+`cloudbase-setup.md` 按界面操作顺序说明：微信开发者工具导入项目、替换真实 AppID、开通云开发环境、创建 `users`、`generation_jobs`、`generation_preparations`、`credit_events`、`redemption_codes`、`share_grants` 六个集合并全部设置“仅管理端可读写”；为 `generation_jobs` 建立 `status + reservationExpiresAt + _id` 复合索引和 `_openid + status + reservationExpiresAt + _id` 复合索引，为 `redemption_codes` 建立 `createdAt + _id` 复合索引；将云存储设置为仅创建者可读写；部署 `petMemeApi`，将运行时设置为 Node.js 20.19、超时设置为 300 秒，并配置 `ARK_API_KEY`、`SEEDREAM_MODEL` 和 `ADMIN_OPENIDS`。说明 `generation_preparations` 和 `share_grants` 的过期记录清理方式，以及上传云函数、预览与真机调试。明确不要把密钥粘进小程序代码或截图。
 
 - [ ] **Step 6: 实现每日隐私清理函数**
 

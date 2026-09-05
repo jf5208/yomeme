@@ -98,6 +98,29 @@ async function ensureUser({ db, openid, now }) {
   });
 }
 
+async function claimAdjustmentSlot({ transaction, openid, sourceJobId, jobId }) {
+  const source = await getDocument(transaction, "generation_jobs", sourceJobId);
+  requireOwnedJob(source, openid);
+  if (
+    source.status !== "succeeded"
+    || source.isRegeneration
+    || typeof source.templateFileId !== "string"
+    || !Array.isArray(source.petFileIds)
+  ) {
+    throw businessError("invalid_source_job", "原生成任务不能用于再次调整。");
+  }
+  if (source.adjustmentSucceededJobId) {
+    throw businessError("adjustment_limit_reached", "这个结果已经调整过一次了。");
+  }
+  if (source.adjustmentReservedJobId && source.adjustmentReservedJobId !== jobId) {
+    throw businessError("adjustment_in_progress", "这个结果正在调整中。");
+  }
+  await transaction.collection("generation_jobs").doc(sourceJobId).update({
+    data: { adjustmentReservedJobId: jobId },
+  });
+  return source;
+}
+
 async function reserveGeneration({
   db,
   openid,
@@ -120,6 +143,19 @@ async function reserveGeneration({
       return { job: existingJob, acquired: false };
     }
 
+    let resolvedTemplateFileId = templateFileId;
+    let resolvedPetFileIds = [...petFileIds];
+    if (sourceJobId) {
+      const source = await claimAdjustmentSlot({
+        transaction,
+        openid,
+        sourceJobId,
+        jobId,
+      });
+      resolvedTemplateFileId = source.templateFileId;
+      resolvedPetFileIds = [...source.petFileIds];
+    }
+
     let user = await getDocument(transaction, "users", openid);
     if (!user) user = await createUser(transaction, openid, createdAt);
     if (user.credits < GENERATION_COST) {
@@ -133,8 +169,8 @@ async function reserveGeneration({
       _openid: openid,
       status: "reserved",
       creditCost: GENERATION_COST,
-      templateFileId,
-      petFileIds: [...petFileIds],
+      templateFileId: resolvedTemplateFileId,
+      petFileIds: resolvedPetFileIds,
       resultFileId: null,
       adjustment: adjustment || "",
       sourceJobId: sourceJobId || null,
@@ -183,6 +219,18 @@ async function completeGeneration({ db, openid, jobId, resultFileId, now }) {
       errorCode: null,
       completedAt,
     };
+    if (job.sourceJobId) {
+      const source = await getDocument(transaction, "generation_jobs", job.sourceJobId);
+      if (!source || source.adjustmentReservedJobId !== jobId) {
+        throw businessError("invalid_source_job", "调整任务状态无效。");
+      }
+      await transaction.collection("generation_jobs").doc(job.sourceJobId).update({
+        data: {
+          adjustmentReservedJobId: null,
+          adjustmentSucceededJobId: jobId,
+        },
+      });
+    }
     await transaction.collection("generation_jobs").doc(jobId).update({ data: update });
     await addCreditEvent(transaction, {
       _openid: openid,
@@ -207,7 +255,9 @@ async function refundGeneration({ db, openid, jobId, errorCode, now }) {
     if (!ALLOWED_TRANSITIONS[job.status]) {
       throw businessError("invalid_job_status", "生成任务状态无效。");
     }
-    if (!ALLOWED_TRANSITIONS[job.status].has("failed")) return job;
+    if (!ALLOWED_TRANSITIONS[job.status].has("failed")) {
+      return { ...job, refunded: false };
+    }
 
     const user = await getDocument(transaction, "users", openid);
     if (!user) throw businessError("user_not_found", "用户不存在。");
@@ -218,6 +268,14 @@ async function refundGeneration({ db, openid, jobId, errorCode, now }) {
       errorCode,
       completedAt,
     };
+    if (job.sourceJobId) {
+      const source = await getDocument(transaction, "generation_jobs", job.sourceJobId);
+      if (source && source.adjustmentReservedJobId === jobId) {
+        await transaction.collection("generation_jobs").doc(job.sourceJobId).update({
+          data: { adjustmentReservedJobId: null },
+        });
+      }
+    }
     await transaction.collection("users").doc(openid).update({
       data: { credits: balanceAfter, updatedAt: completedAt },
     });
@@ -231,7 +289,7 @@ async function refundGeneration({ db, openid, jobId, errorCode, now }) {
       jobId,
       createdAt: completedAt,
     });
-    return { ...job, ...update };
+    return { ...job, ...update, refunded: true };
   });
 }
 

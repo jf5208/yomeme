@@ -21,13 +21,6 @@ function validateGenerationInput(event) {
   ) {
     throw invalidInput("请上传 1 到 3 张宠物照片。");
   }
-  if (
-    !Number.isFinite(event.templateWidth)
-    || event.templateWidth <= 0
-    || event.templateWidth !== event.templateHeight
-  ) {
-    throw invalidInput("模板必须是 1:1 正方形图片。");
-  }
   if (event.rightsConfirmed !== true) {
     throw invalidInput("请先确认素材权利。");
   }

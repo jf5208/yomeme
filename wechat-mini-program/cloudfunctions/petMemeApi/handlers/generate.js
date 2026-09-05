@@ -1,4 +1,5 @@
 const crypto = require("node:crypto");
+const sharp = require("sharp");
 const {
   reserveGeneration,
   completeGeneration,
@@ -6,9 +7,14 @@ const {
 } = require("../domain/credits");
 const { validateGenerationInput } = require("../domain/validation");
 const { generateImage: requestSeedream } = require("../services/seedream");
+const { PREPARATION_TTL_MS } = require("../config");
 
 const JOB_ID_PATTERN = /^[A-Za-z0-9-]{16,64}$/;
 const IMAGE_EXTENSION_PATTERN = "(?:png|jpe?g|webp)";
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGE_DIMENSION = 4096;
+const MAX_IMAGE_PIXELS = 16_000_000;
+const MIN_IMAGE_DIMENSION = 8;
 const SAFE_FAILURE_CODES = new Set([
   "content_rejected",
   "invalid_image",
@@ -28,6 +34,12 @@ function businessError(code, message) {
 function requireOpenid(openid) {
   if (typeof openid !== "string" || openid.length === 0) {
     throw businessError("invalid_identity", "无法识别当前微信用户。");
+  }
+}
+
+function requireEnvironmentId(environmentId) {
+  if (typeof environmentId !== "string" || !/^[A-Za-z0-9._-]{1,128}$/.test(environmentId)) {
+    throw businessError("invalid_environment", "无法识别当前云环境。");
   }
 }
 
@@ -63,7 +75,27 @@ function extractCloudPath(fileId) {
   }
 }
 
-function validateUploadLayout({ jobId, templateFileId, petFileIds }) {
+function extractCloudAuthority(fileId) {
+  if (typeof fileId !== "string") return null;
+  const match = /^cloud:\/\/([^/?#]+)\/(.+)$/.exec(fileId.trim());
+  return match && !/[?#]/.test(match[2]) ? match[1] : null;
+}
+
+function authorityMatchesEnvironment(authority, environmentId) {
+  return authority === environmentId || authority.startsWith(`${environmentId}.`);
+}
+
+function validateFileEnvironment(fileIds, environmentId) {
+  if (fileIds.some((fileId) => !authorityMatchesEnvironment(
+    extractCloudAuthority(fileId) || "",
+    environmentId,
+  ))) {
+    throw businessError("invalid_input", "图片文件不属于当前云环境。");
+  }
+}
+
+function validateUploadLayout({ jobId, templateFileId, petFileIds, environmentId }) {
+  validateFileEnvironment([templateFileId, ...petFileIds], environmentId);
   const escapedJobId = jobId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const templatePattern = new RegExp(
     `^uploads/${escapedJobId}/template\\.${IMAGE_EXTENSION_PATTERN}$`,
@@ -84,35 +116,73 @@ function validateUploadLayout({ jobId, templateFileId, petFileIds }) {
   }
 }
 
-function detectMimeType(bytes) {
-  if (bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([
-    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-  ]))) return "image/png";
-  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
-    return "image/jpeg";
-  }
+function invalidImage() {
+  return businessError("invalid_image", "图片文件无效。");
+}
+
+function validateDimensions(width, height) {
   if (
-    bytes.length >= 12
-    && bytes.subarray(0, 4).toString("ascii") === "RIFF"
-    && bytes.subarray(8, 12).toString("ascii") === "WEBP"
-  ) return "image/webp";
-  return null;
+    !Number.isInteger(width)
+    || !Number.isInteger(height)
+    || width < MIN_IMAGE_DIMENSION
+    || height < MIN_IMAGE_DIMENSION
+    || width > MAX_IMAGE_DIMENSION
+    || height > MAX_IMAGE_DIMENSION
+    || width * height > MAX_IMAGE_PIXELS
+  ) throw invalidImage();
+  return { width, height };
 }
 
-function validateDownloadedImage(download) {
+async function inspectImage(bytes) {
+  if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > MAX_IMAGE_BYTES) {
+    throw invalidImage();
+  }
+  try {
+    const decoderOptions = {
+      failOn: "error",
+      limitInputPixels: MAX_IMAGE_PIXELS,
+      sequentialRead: true,
+    };
+    const metadata = await sharp(bytes, decoderOptions).metadata();
+    const mimeTypes = {
+      png: "image/png",
+      jpeg: "image/jpeg",
+      webp: "image/webp",
+    };
+    const mimeType = mimeTypes[metadata.format];
+    if (!mimeType || (metadata.pages && metadata.pages !== 1)) throw invalidImage();
+    const dimensions = validateDimensions(metadata.width, metadata.height);
+    await sharp(bytes, decoderOptions).raw().toBuffer();
+    return { mimeType, ...dimensions };
+  } catch (_error) {
+    throw invalidImage();
+  }
+}
+
+async function validateDownloadedImage(download) {
   const bytes = download && download.fileContent;
-  const mimeType = Buffer.isBuffer(bytes) ? detectMimeType(bytes) : null;
-  if (!mimeType) throw businessError("invalid_image", "图片文件无效。");
-  return { bytes, mimeType };
+  const inspected = await inspectImage(bytes);
+  return { bytes, ...inspected };
 }
 
-function validateGeneratedImage(image) {
+async function validateGeneratedImage(image) {
   const bytes = image && image.bytes;
-  const detectedMimeType = Buffer.isBuffer(bytes) ? detectMimeType(bytes) : null;
-  if (!detectedMimeType || detectedMimeType !== image.mimeType) {
+  try {
+    const inspected = await inspectImage(bytes);
+    if (inspected.width !== inspected.height) throw invalidImage();
+    return { bytes, ...inspected };
+  } catch (_error) {
     throw businessError("provider_failed", "图片生成失败。");
   }
-  return bytes;
+}
+
+function extensionForMimeType(mimeType) {
+  const extensions = {
+    "image/png": "png",
+    "image/jpeg": "jpg",
+    "image/webp": "webp",
+  };
+  return extensions[mimeType];
 }
 
 async function getJob(db, jobId) {
@@ -120,7 +190,30 @@ async function getJob(db, jobId) {
   return result.data || null;
 }
 
-async function resolveGenerationInput({ db, openid, event }) {
+async function requirePreparation({ db, openid, environmentId, jobId, now }) {
+  const result = await db.collection("generation_preparations").doc(jobId).get();
+  const preparation = result.data || null;
+  if (!preparation) {
+    throw businessError("preparation_required", "请重新开始生成任务。");
+  }
+  if (preparation._openid !== openid) {
+    throw businessError("forbidden", "无权使用这个生成任务。");
+  }
+  if (preparation.environmentId !== environmentId) {
+    throw businessError("forbidden", "生成任务不属于当前云环境。");
+  }
+  const current = now === undefined ? new Date() : new Date(now);
+  const expiresAt = new Date(preparation.expiresAt);
+  if (Number.isNaN(current.getTime()) || Number.isNaN(expiresAt.getTime())) {
+    throw businessError("preparation_expired", "生成任务已过期，请重新开始。");
+  }
+  if (expiresAt.getTime() <= current.getTime()) {
+    throw businessError("preparation_expired", "生成任务已过期，请重新开始。");
+  }
+  return preparation;
+}
+
+async function resolveGenerationInput({ db, openid, environmentId, event }) {
   requireJobId(event && event.jobId);
   if (!event.sourceJobId) {
     const validated = validateGenerationInput(event);
@@ -132,7 +225,7 @@ async function resolveGenerationInput({ db, openid, event }) {
       adjustment: validated.adjustment,
       sourceJobId: null,
     };
-    validateUploadLayout(resolved);
+    validateUploadLayout({ ...resolved, environmentId });
     return resolved;
   }
 
@@ -143,9 +236,10 @@ async function resolveGenerationInput({ db, openid, event }) {
   if (source._openid !== openid) {
     throw businessError("forbidden", "无权使用这个生成任务。");
   }
-  if (source.status !== "succeeded") {
+  if (source.status !== "succeeded" || source.isRegeneration) {
     throw businessError("invalid_source_job", "原生成任务尚未成功。");
   }
+  validateFileEnvironment([source.templateFileId, ...source.petFileIds], environmentId);
   return {
     jobId: event.jobId,
     templateFileId: source.templateFileId,
@@ -163,10 +257,28 @@ function safeFailureCode(error) {
   return error && SAFE_FAILURE_CODES.has(error.code) ? error.code : "generation_failed";
 }
 
-async function prepareGeneration({ openid, randomUUID = crypto.randomUUID }) {
+async function prepareGeneration({
+  db,
+  openid,
+  environmentId,
+  randomUUID = crypto.randomUUID,
+  now,
+}) {
   requireOpenid(openid);
+  requireEnvironmentId(environmentId);
   const jobId = randomUUID();
   requireJobId(jobId);
+  const createdAt = now === undefined ? new Date() : new Date(now);
+  if (Number.isNaN(createdAt.getTime())) throw new TypeError("now must be a valid date");
+  await db.collection("generation_preparations").doc(jobId).set({
+    data: {
+      jobId,
+      _openid: openid,
+      environmentId,
+      createdAt,
+      expiresAt: new Date(createdAt.getTime() + PREPARATION_TTL_MS),
+    },
+  });
   return { jobId };
 }
 
@@ -174,12 +286,23 @@ async function generate({
   db,
   cloud,
   openid,
+  environmentId,
   event,
   now,
   generateImage = requestSeedream,
 }) {
   requireOpenid(openid);
-  const resolved = await resolveGenerationInput({ db, openid, event });
+  requireEnvironmentId(environmentId);
+  requireJobId(event && event.jobId);
+  const existingJob = await getJob(db, event.jobId);
+  if (existingJob) {
+    if (existingJob._openid !== openid) {
+      throw businessError("job_conflict", "生成任务编号已被使用。");
+    }
+    return sanitizedStatus(existingJob);
+  }
+  await requirePreparation({ db, openid, environmentId, jobId: event.jobId, now });
+  const resolved = await resolveGenerationInput({ db, openid, environmentId, event });
   const reservation = await reserveGeneration({
     db,
     openid,
@@ -192,15 +315,17 @@ async function generate({
     const fileIds = [resolved.templateFileId, ...resolved.petFileIds];
     const downloads = [];
     for (const fileID of fileIds) {
-      downloads.push(validateDownloadedImage(await cloud.downloadFile({ fileID })));
+      downloads.push(await validateDownloadedImage(await cloud.downloadFile({ fileID })));
     }
-    const generated = await generateImage({
+    if (downloads[0].width !== downloads[0].height) throw invalidImage();
+    const providerResult = await generateImage({
       images: downloads,
       adjustment: resolved.adjustment,
     });
-    const fileContent = validateGeneratedImage(generated);
-    const cloudPath = `results/${openid}/${resolved.jobId}.png`;
-    const uploaded = await cloud.uploadFile({ cloudPath, fileContent });
+    const generated = await validateGeneratedImage(providerResult);
+    const extension = extensionForMimeType(generated.mimeType);
+    const cloudPath = `results/${openid}/${resolved.jobId}.${extension}`;
+    const uploaded = await cloud.uploadFile({ cloudPath, fileContent: generated.bytes });
     if (!uploaded || typeof uploaded.fileID !== "string" || !extractCloudPath(uploaded.fileID)) {
       throw businessError("upload_failed", "生成结果保存失败。");
     }
@@ -229,4 +354,5 @@ module.exports = {
   generate,
   extractCloudPath,
   validateDownloadedImage,
+  MAX_IMAGE_BYTES,
 };

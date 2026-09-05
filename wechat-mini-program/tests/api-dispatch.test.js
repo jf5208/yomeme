@@ -31,15 +31,25 @@ function dependencies(overrides = {}) {
 
 test("dispatch 只使用微信上下文 OPENID", async () => {
   const deps = dependencies();
+  deps.getWXContext = () => ({ OPENID: "real-user", ENV: "env-current" });
 
   const result = await dispatch(
-    { action: "bootstrap", openid: "attacker", code: "SECRET-CODE" },
+    {
+      action: "bootstrap",
+      openid: "attacker",
+      environmentId: "env-attacker",
+      ENV: "env-attacker",
+      code: "SECRET-CODE",
+    },
     deps,
   );
 
   assert.deepEqual(result, { ok: true, data: { credits: 300 } });
   assert.equal(deps.calls[0].openid, "real-user");
+  assert.equal(deps.calls[0].environmentId, "env-current");
   assert.equal(deps.calls[0].event.openid, undefined);
+  assert.equal(deps.calls[0].event.environmentId, undefined);
+  assert.equal(deps.calls[0].event.ENV, undefined);
 });
 
 test("action 是固定白名单且未知 action 被拒绝", async () => {

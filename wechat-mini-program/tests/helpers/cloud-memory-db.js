@@ -17,11 +17,14 @@ function createMemoryDb(initial = {}) {
   let state = clone({
     users: {},
     generation_jobs: {},
+    generation_preparations: {},
     credit_events: {},
     redemption_codes: {},
+    share_grants: {},
     ...initial,
   });
   let transactionQueue = Promise.resolve();
+  const queryCalls = [];
 
   function collectionFor(targetState, name) {
     const rows = targetState[name];
@@ -66,6 +69,13 @@ function createMemoryDb(initial = {}) {
         return collection;
       },
       async get() {
+        queryCalls.push({
+          collection: name,
+          conditions: clone(conditions),
+          orderings: clone(orderings),
+          offset,
+          pageSize,
+        });
         const documents = Object.values(rows)
           .filter((document) => Object.entries(conditions).every(
             ([field, expected]) => matches(document[field], expected),
@@ -117,6 +127,7 @@ function createMemoryDb(initial = {}) {
     rows(collectionName) {
       return state[collectionName];
     },
+    queryCalls,
   };
 
   return db;

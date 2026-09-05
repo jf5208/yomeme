@@ -281,6 +281,8 @@ test("生成失败只退款一次", async () => {
 
   assert.equal(first.status, "failed");
   assert.equal(second.status, "failed");
+  assert.equal(first.refunded, true);
+  assert.equal(second.refunded, false);
   assert.equal(db.users.u1.credits, 300);
   assert.equal(db.creditEvents.filter((row) => row.eventType === "generation_refund").length, 1);
 });
@@ -360,7 +362,6 @@ test("生成输入拒绝非法任务编号、文件、比例、权利和超长�
     { ...valid, petFileIds: [] },
     { ...valid, petFileIds: [...valid.petFileIds, "cloud://pet-2", "cloud://pet-3", "cloud://pet-4"] },
     { ...valid, petFileIds: ["cloud://pet-1", ""] },
-    { ...valid, templateHeight: 1079 },
     { ...valid, rightsConfirmed: false },
     { ...valid, adjustment: "猫".repeat(301) },
   ];
