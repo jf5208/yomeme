@@ -14,6 +14,37 @@ const BUSINESS_ERRORS = {
   provider_failed: "图片生成失败，请稍后再试。",
 };
 
+const AUTH_ERROR_CODES = new Set([
+  "authenticationerror",
+]);
+const OVERDUE_ERROR_CODES = new Set([
+  "accountoverdueerror",
+  "operationdenied.serviceoverdue",
+]);
+const PRESSURE_ERROR_CODES = new Set([
+  "quotaexceeded",
+  "ratelimitexceeded.endpointrpmexceeded",
+  "ratelimitexceeded.endpointtpmexceeded",
+  "modelaccountrpmratelimitexceeded",
+  "modelaccounttpmratelimitexceeded",
+  "modelaccountipmratelimitexceeded",
+  "accountratelimitexceeded",
+  "apiaccountrpmratelimitexceeded",
+  "serveroverloaded",
+  "requestbursttoofast",
+  "inflightbatchsizeexceeded",
+]);
+const CONTENT_ERROR_CODES = new Set([
+  "inputimagesensitivecontentdetected",
+  "outputimagesensitivecontentdetected",
+  "sensitivecontentdetected",
+]);
+const INACTIVE_MODEL_ERROR_CODES = new Set([
+  "invalidendpointormodel.notfound",
+  "modelnotopen",
+  "modelnotfound",
+]);
+
 class SeedreamBusinessError extends Error {
   constructor(code) {
     super(BUSINESS_ERRORS[code] || BUSINESS_ERRORS.provider_failed);
@@ -26,26 +57,50 @@ function asDataUrl(image) {
   return `data:${image.mimeType};base64,${Buffer.from(image.bytes).toString("base64")}`;
 }
 
-function providerErrorText(payload) {
-  if (!payload || typeof payload !== "object") return "";
+function providerErrorDetails(payload) {
+  if (!payload || typeof payload !== "object") return { code: "", text: "" };
   const error = payload.error;
   if (error && typeof error === "object") {
-    return `${error.code || ""} ${error.message || ""}`;
+    const code = String(error.code || "").trim().toLowerCase();
+    return { code, text: `${error.code || ""} ${error.message || ""}` };
   }
-  return `${payload.code || ""} ${payload.message || ""}`;
+  const code = String(payload.code || "").trim().toLowerCase();
+  return { code, text: `${payload.code || ""} ${payload.message || ""}` };
 }
 
 function mapProviderError(status, payload) {
-  const text = providerErrorText(payload);
+  const { code, text } = providerErrorDetails(payload);
 
+  if (AUTH_ERROR_CODES.has(code)) {
+    return new SeedreamBusinessError("provider_not_configured");
+  }
+  if (OVERDUE_ERROR_CODES.has(code)) {
+    return new SeedreamBusinessError("provider_insufficient_balance");
+  }
+  if (PRESSURE_ERROR_CODES.has(code)) {
+    return new SeedreamBusinessError("provider_failed");
+  }
+  if (CONTENT_ERROR_CODES.has(code)) {
+    return new SeedreamBusinessError("content_rejected");
+  }
+  if (INACTIVE_MODEL_ERROR_CODES.has(code)) {
+    return new SeedreamBusinessError("provider_model_inactive");
+  }
+
+  if (/invalid credentials|invalid api key|authentication failed|鉴权失败|凭证.*(?:无效|过期)/i.test(text)) {
+    return new SeedreamBusinessError("provider_not_configured");
+  }
   if (/sensitive|safety|moderation|content.?review|risk.?control|审核|敏感/i.test(text)) {
     return new SeedreamBusinessError("content_rejected");
   }
-  if (/quota|balance|insufficient|overdue|arrear|欠费|余额不足/i.test(text)) {
+  if (/account.*overdue|service.*overdue|insufficient balance|arrear|欠费|余额不足/i.test(text)) {
     return new SeedreamBusinessError("provider_insufficient_balance");
   }
   if (/not.?activated|not.?open|model.*not.?found|invalidendpointormodel|未开通|未激活/i.test(text)) {
     return new SeedreamBusinessError("provider_model_inactive");
+  }
+  if (/queue|concurrenc|rate.?limit|too many requests|high load|overload|排队|并发|限流|繁忙/i.test(text)) {
+    return new SeedreamBusinessError("provider_failed");
   }
   if (status === 400 || status === 401 || status === 403 || status === 404 || status === 422) {
     return new SeedreamBusinessError("provider_rejected");
@@ -67,7 +122,20 @@ function detectMimeType(bytes) {
     && bytes.subarray(8, 12).toString("ascii") === "WEBP") {
     return "image/webp";
   }
-  return "image/png";
+  return null;
+}
+
+function decodeBase64(value) {
+  if (typeof value !== "string" || value.length === 0) return null;
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(value)) return null;
+  if (value.includes("=") && value.length % 4 !== 0) return null;
+  if (value.length % 4 === 1) return null;
+
+  const bytes = Buffer.from(value, "base64");
+  if (bytes.length === 0) return null;
+  const canonicalInput = value.replace(/=+$/, "");
+  const canonicalOutput = bytes.toString("base64").replace(/=+$/, "");
+  return canonicalInput === canonicalOutput ? bytes : null;
 }
 
 async function readJson(response) {
@@ -123,11 +191,12 @@ async function generateImage({ apiKey, model, images, adjustment, fetchImpl } = 
       throw new SeedreamBusinessError("provider_failed");
     }
 
-    const bytes = Buffer.from(encoded, "base64");
-    if (bytes.length === 0) {
+    const bytes = decodeBase64(encoded);
+    const mimeType = bytes ? detectMimeType(bytes) : null;
+    if (!bytes || !mimeType) {
       throw new SeedreamBusinessError("provider_failed");
     }
-    return { bytes, mimeType: detectMimeType(bytes) };
+    return { bytes, mimeType };
   } catch (error) {
     if (error instanceof SeedreamBusinessError) throw error;
     if (controller.signal.aborted || (error && error.name === "AbortError")) {

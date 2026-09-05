@@ -156,19 +156,84 @@ test("普通 400 拒绝转成不泄露密钥的业务错误", async () => {
   assert.doesNotMatch(`${error.name} ${error.code} ${error.message} ${error.stack}`, new RegExp(SECRET));
 });
 
-test("内容审核、余额不足、模型未开通和未知错误使用简短中文提示", async () => {
+test("官方鉴权错误优先映射为服务配置错误且不泄露上游内容", async () => {
+  const cases = [
+    {
+      status: 401,
+      body: { error: { code: "AuthenticationError", message: `sensitive information ${SECRET}` } },
+    },
+    {
+      status: 401,
+      body: { error: { code: "Unauthorized", message: `invalid credentials ${SECRET}` } },
+    },
+  ];
+
+  for (const item of cases) {
+    const error = await captureError(() => generateImage({
+      apiKey: SECRET,
+      images: IMAGES.slice(0, 2),
+      adjustment: "",
+      fetchImpl: async () => jsonResponse(item.status, item.body),
+    }));
+    assert.equal(error.code, "provider_not_configured");
+    assert.equal(error.message, "生成服务暂未配置，请联系管理员。");
+    assert.doesNotMatch(error.stack, new RegExp(SECRET));
+  }
+});
+
+test("官方欠费错误优先映射为服务余额不足", async () => {
+  const officialCodes = ["AccountOverdueError", "OperationDenied.ServiceOverdue"];
+
+  for (const code of officialCodes) {
+    const error = await captureError(() => generateImage({
+      apiKey: SECRET,
+      images: IMAGES.slice(0, 2),
+      adjustment: "",
+      fetchImpl: async () => jsonResponse(403, {
+        error: { code, message: "request denied" },
+      }),
+    }));
+    assert.equal(error.code, "provider_insufficient_balance");
+    assert.equal(error.message, "生成服务余额不足，请联系管理员。");
+  }
+});
+
+test("官方配额、队列、并发和限流压力映射为临时生成失败", async () => {
+  const officialCodes = [
+    "QuotaExceeded",
+    "RateLimitExceeded.EndpointRPMExceeded",
+    "RateLimitExceeded.EndpointTPMExceeded",
+    "ModelAccountRpmRateLimitExceeded",
+    "ModelAccountTpmRateLimitExceeded",
+    "ModelAccountIpmRateLimitExceeded",
+    "AccountRateLimitExceeded",
+    "APIAccountRpmRateLimitExceeded",
+    "ServerOverloaded",
+    "RequestBurstTooFast",
+    "InflightBatchsizeExceeded",
+  ];
+
+  for (const code of officialCodes) {
+    const error = await captureError(() => generateImage({
+      apiKey: SECRET,
+      images: IMAGES.slice(0, 2),
+      adjustment: "",
+      fetchImpl: async () => jsonResponse(429, {
+        error: { code, message: "insufficient balance, retry later" },
+      }),
+    }));
+    assert.equal(error.code, "provider_failed");
+    assert.equal(error.message, "图片生成失败，请稍后再试。");
+  }
+});
+
+test("内容审核、模型未开通和未知错误使用简短中文提示", async () => {
   const cases = [
     {
       status: 400,
       body: { error: { code: "OutputImageSensitiveContentDetected", message: "sensitive information" } },
       code: "content_rejected",
       message: "图片内容未通过安全审核，请更换素材后重试。",
-    },
-    {
-      status: 429,
-      body: { error: { code: "QuotaExceeded", message: "insufficient balance" } },
-      code: "provider_insufficient_balance",
-      message: "生成服务余额不足，请联系管理员。",
     },
     {
       status: 404,
@@ -303,4 +368,52 @@ test("网络异常和无有效图片响应不会泄露上游详情", async () =>
   }));
   assert.equal(responseError.code, "provider_failed");
   assert.equal(responseError.message, "图片生成失败，请稍后再试。");
+});
+
+test("畸形 Base64 响应不能作为成功图片返回下游", async () => {
+  const error = await captureError(() => generateImage({
+    apiKey: SECRET,
+    images: IMAGES.slice(0, 2),
+    adjustment: "",
+    fetchImpl: async () => jsonResponse(200, {
+      data: [{ b64_json: "%%%not-valid-base64%%%" }],
+    }),
+  }));
+
+  assert.equal(error.code, "provider_failed");
+  assert.equal(error.message, "图片生成失败，请稍后再试。");
+});
+
+test("没有 PNG JPEG 或 WebP 签名的字节不能作为成功图片返回下游", async () => {
+  const error = await captureError(() => generateImage({
+    apiKey: SECRET,
+    images: IMAGES.slice(0, 2),
+    adjustment: "",
+    fetchImpl: async () => jsonResponse(200, {
+      data: [{ b64_json: Buffer.from("plain text, not an image").toString("base64") }],
+    }),
+  }));
+
+  assert.equal(error.code, "provider_failed");
+  assert.equal(error.message, "图片生成失败，请稍后再试。");
+});
+
+test("只把带 PNG JPEG 或 WebP 签名的解码结果作为成功图片", async () => {
+  const cases = [
+    { bytes: PNG_BYTES, mimeType: "image/png" },
+    { bytes: Buffer.from([0xff, 0xd8, 0xff, 0xe0]), mimeType: "image/jpeg" },
+    { bytes: Buffer.from("RIFF0000WEBP", "ascii"), mimeType: "image/webp" },
+  ];
+
+  for (const item of cases) {
+    const result = await generateImage({
+      apiKey: SECRET,
+      images: IMAGES.slice(0, 2),
+      adjustment: "",
+      fetchImpl: async () => jsonResponse(200, {
+        data: [{ b64_json: item.bytes.toString("base64") }],
+      }),
+    });
+    assert.deepEqual(result, item);
+  }
 });
