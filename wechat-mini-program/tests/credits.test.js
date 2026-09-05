@@ -131,7 +131,12 @@ test("新用户只领取一次 300 积分", async () => {
 test("bootstrap 返回当前微信用户的积分", async () => {
   const db = createMemoryDb();
 
-  const result = await bootstrap({ db, openid: "u1", now: NOW });
+  const result = await bootstrap({
+    db,
+    openid: "u1",
+    now: NOW,
+    recoverCallerStaleJobs: async () => ({ recovered: 0 }),
+  });
 
   assert.deepEqual(result, { credits: 300 });
 });
