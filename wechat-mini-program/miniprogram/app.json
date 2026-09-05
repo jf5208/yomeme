@@ -1,0 +1,9 @@
+{
+  "pages": [
+    "pages/create/index",
+    "pages/result/index",
+    "pages/credits/index",
+    "pages/guide/index",
+    "pages/admin/index"
+  ]
+}
