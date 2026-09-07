@@ -1,0 +1,73 @@
+<view class="page">
+  <view class="topbar">
+    <text class="brand">我家版本</text>
+    <navigator class="credits-link" url="/pages/credits/index">积分</navigator>
+  </view>
+
+  <view wx:if="{{loading}}" class="state-panel">
+    <text class="state-title">正在打开作品…</text>
+  </view>
+
+  <view wx:elif="{{status === 'succeeded'}}">
+    <view class="result-frame">
+      <image class="result-image" src="{{imageUrl}}" mode="widthFix" show-menu-by-longpress="{{true}}" />
+    </view>
+    <text wx:if="{{generatedAt}}" class="generated-at">生成于 {{generatedAt}}</text>
+
+    <view class="action-row">
+      <button class="secondary-button" bindtap="saveImage" loading="{{saving}}">保存图片</button>
+      <button
+        wx:if="{{!readOnly}}"
+        class="primary-button"
+        open-type="share"
+        disabled="{{!shareToken}}"
+      >分享给朋友</button>
+    </view>
+    <text wx:if="{{!readOnly}}" class="share-note">分享链接最长 7 天有效。</text>
+
+    <view wx:if="{{readOnly}}" class="read-only-note">这是朋友分享的作品，仅供查看与保存。</view>
+
+    <view wx:elif="{{canAdjust}}" class="adjust-section">
+      <text class="section-title">还想改一点？</text>
+      <textarea
+        class="adjust-input"
+        maxlength="300"
+        value="{{adjustment}}"
+        bindinput="onAdjustmentInput"
+        placeholder="例如：耳朵更像我家猫，眼神更委屈一点"
+      />
+      <text class="cost-note">再次生成将消耗 100 积分，失败会自动退回。</text>
+      <button
+        class="primary-button full-button"
+        bindtap="submitAdjustment"
+        loading="{{adjusting}}"
+        disabled="{{!adjustment || adjusting}}"
+      >按意见再生成一次</button>
+    </view>
+    <view wx:else class="read-only-note">这张作品的一次调整机会已经使用。</view>
+  </view>
+
+  <view wx:elif="{{status === 'reserved'}}" class="state-panel">
+    <text class="state-title">正在生成</text>
+    <text class="state-copy">作品还在准备中，可以稍后返回这个页面查看。</text>
+    <navigator class="primary-link" url="/pages/create/index" open-type="reLaunch">先回创作页</navigator>
+  </view>
+
+  <view wx:elif="{{status === 'expired'}}" class="state-panel">
+    <text class="state-title">作品已过保存期</text>
+    <text class="state-copy">生成结果会保留 30 天，之后自动清理。下次记得及时保存到相册。</text>
+    <navigator class="primary-link" url="/pages/create/index" open-type="reLaunch">重新做一张</navigator>
+  </view>
+
+  <view wx:elif="{{status === 'shareUnavailable'}}" class="state-panel">
+    <text class="state-title">这个分享已失效</text>
+    <text class="state-copy">分享链接可能已过期，或作品已经超过保存期。</text>
+    <navigator class="primary-link" url="/pages/create/index" open-type="reLaunch">做一张自己的</navigator>
+  </view>
+
+  <view wx:else class="state-panel">
+    <text class="state-title">这张作品暂时没有准备好</text>
+    <text class="state-copy">生成失败，本次未扣积分。可以返回首页重新试一次。</text>
+    <navigator class="primary-link" url="/pages/create/index" open-type="reLaunch">返回创作页</navigator>
+  </view>
+</view>

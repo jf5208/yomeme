@@ -1,0 +1,10 @@
+{
+  "name": "yomeme-pet-meme-api",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.js",
+  "dependencies": {
+    "sharp": "^0.35.4",
+    "wx-server-sdk": "^4.0.2"
+  }
+}

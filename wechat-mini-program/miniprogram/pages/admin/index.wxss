@@ -1,0 +1,152 @@
+.page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 34rpx 28rpx 60rpx;
+  color: #382f2c;
+  background: #fffaf7;
+}
+
+.title,
+.subtitle,
+.section-title,
+.state-title,
+.state-copy,
+.code-value,
+.code-hint,
+.code-meta {
+  display: block;
+}
+
+.title {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #c95f55;
+}
+
+.subtitle,
+.state-copy {
+  margin-top: 10rpx;
+  font-size: 25rpx;
+  line-height: 1.6;
+  color: #786a65;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18rpx;
+  margin-top: 32rpx;
+}
+
+.field {
+  font-size: 25rpx;
+  color: #665955;
+}
+
+.field input {
+  height: 84rpx;
+  box-sizing: border-box;
+  margin-top: 10rpx;
+  padding: 0 20rpx;
+  border: 1px solid #dfcfc9;
+  border-radius: 8px;
+  font-size: 28rpx;
+  background: #ffffff;
+}
+
+.create-button {
+  width: 100%;
+  min-height: 88rpx;
+  margin-top: 20rpx;
+  border-radius: 8px;
+  font-size: 29rpx;
+  font-weight: 650;
+  line-height: 88rpx;
+  color: #ffffff;
+  background: #d96b5b;
+}
+
+.create-button::after,
+.copy-button::after,
+.disable-button::after {
+  border: 0;
+}
+
+.new-code-section,
+.history-section {
+  margin-top: 42rpx;
+  padding-top: 30rpx;
+  border-top: 1px solid #eaded8;
+}
+
+.section-title,
+.state-title {
+  font-size: 30rpx;
+  font-weight: 650;
+}
+
+.new-code,
+.code-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+  margin-top: 16rpx;
+  padding: 20rpx;
+  border: 1px solid #eaded8;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.code-value,
+.code-hint {
+  overflow-wrap: anywhere;
+  font-size: 26rpx;
+}
+
+.code-info {
+  min-width: 0;
+}
+
+.code-meta {
+  margin-top: 6rpx;
+  font-size: 23rpx;
+  color: #8a7973;
+}
+
+.copy-button,
+.disable-button {
+  flex: 0 0 auto;
+  min-height: 62rpx;
+  margin: 0;
+  padding: 0 22rpx;
+  border-radius: 8px;
+  font-size: 25rpx;
+  line-height: 62rpx;
+}
+
+.copy-button {
+  color: #8d4a43;
+  background: #ffe2dd;
+}
+
+.disable-button {
+  border: 1px solid #d9c7c2;
+  color: #786a65;
+  background: #ffffff;
+}
+
+.status-text,
+.empty {
+  font-size: 24rpx;
+  color: #8a7973;
+}
+
+.empty {
+  margin-top: 20rpx;
+}
+
+.state {
+  padding: 80rpx 24rpx;
+  text-align: center;
+}

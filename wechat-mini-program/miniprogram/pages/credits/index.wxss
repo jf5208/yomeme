@@ -1,0 +1,100 @@
+.page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 32rpx 28rpx 56rpx;
+  color: #382f2c;
+  background: #fffaf7;
+}
+
+.balance-panel {
+  padding: 34rpx 30rpx;
+  border: 1px solid #efd894;
+  border-radius: 8px;
+  background: #ffedbd;
+}
+
+.eyebrow,
+.balance,
+.balance-note,
+.section-title,
+.section-copy {
+  display: block;
+}
+
+.eyebrow {
+  font-size: 25rpx;
+  color: #725d35;
+}
+
+.balance {
+  margin-top: 8rpx;
+  font-size: 68rpx;
+  font-weight: 700;
+  color: #b7544b;
+}
+
+.balance-note,
+.section-copy {
+  margin-top: 10rpx;
+  font-size: 25rpx;
+  line-height: 1.6;
+  color: #746762;
+}
+
+.redeem-section {
+  margin-top: 46rpx;
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: 650;
+}
+
+.code-input {
+  height: 92rpx;
+  box-sizing: border-box;
+  margin-top: 22rpx;
+  padding: 0 24rpx;
+  border: 1px solid #dfcfc9;
+  border-radius: 8px;
+  font-size: 29rpx;
+  background: #ffffff;
+}
+
+.redeem-button {
+  width: 100%;
+  min-height: 90rpx;
+  margin-top: 18rpx;
+  border-radius: 8px;
+  font-size: 30rpx;
+  font-weight: 650;
+  line-height: 90rpx;
+  color: #ffffff;
+  background: #d96b5b;
+}
+
+.redeem-button::after {
+  border: 0;
+}
+
+.redeem-button[disabled] {
+  color: #ffffff;
+  background: #d9c7c2;
+}
+
+.success-note {
+  margin-top: 18rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 8px;
+  font-size: 26rpx;
+  color: #8d4a43;
+  background: #ffe2dd;
+}
+
+.guide-link {
+  display: block;
+  margin-top: 54rpx;
+  font-size: 26rpx;
+  text-align: center;
+  color: #b7544b;
+}

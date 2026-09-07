@@ -1,0 +1,30 @@
+<view class="page">
+  <view class="balance-panel">
+    <text class="eyebrow">当前积分</text>
+    <text class="balance">{{loading ? '…' : credits}}</text>
+    <text class="balance-note">每生成一张图片消耗 100 积分</text>
+  </view>
+
+  <view class="redeem-section">
+    <text class="section-title">兑换充值码</text>
+    <text class="section-copy">填入收到的充值码，验证后积分会立即到账。</text>
+    <input
+      class="code-input"
+      value="{{code}}"
+      bindinput="onCodeInput"
+      maxlength="64"
+      placeholder="请输入充值码"
+    />
+    <button
+      class="redeem-button"
+      bindtap="redeem"
+      loading="{{redeeming}}"
+      disabled="{{!code || redeeming}}"
+    >确认兑换</button>
+    <view wx:if="{{redeemedCredits > 0}}" class="success-note">
+      本次到账 {{redeemedCredits}} 积分
+    </view>
+  </view>
+
+  <navigator class="guide-link" url="/pages/guide/index">先看看怎样更容易生成好看的图</navigator>
+</view>

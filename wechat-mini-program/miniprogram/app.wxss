@@ -1,0 +1,6 @@
+page {
+  --color-background: #fffaf7;
+  --color-primary: #e9827b;
+  --color-accent: #ffedbd;
+  background: var(--color-background);
+}

@@ -1,0 +1,69 @@
+.page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 38rpx 30rpx 60rpx;
+  color: #382f2c;
+  background: #fffaf7;
+}
+
+.intro {
+  padding-bottom: 34rpx;
+  border-bottom: 1px solid #eaded8;
+}
+
+.title,
+.intro-copy,
+.section-title,
+.section-copy {
+  display: block;
+}
+
+.title {
+  font-size: 42rpx;
+  font-weight: 700;
+  color: #c95f55;
+}
+
+.intro-copy {
+  margin-top: 10rpx;
+  font-size: 26rpx;
+  color: #7b6d68;
+}
+
+.guide-section {
+  display: grid;
+  grid-template-columns: 70rpx minmax(0, 1fr);
+  gap: 18rpx;
+  padding: 30rpx 0;
+  border-bottom: 1px solid #f0e6e1;
+}
+
+.number {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #d96b5b;
+}
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 650;
+}
+
+.section-copy {
+  margin-top: 10rpx;
+  font-size: 26rpx;
+  line-height: 1.72;
+  color: #6f625d;
+}
+
+.primary-link {
+  display: block;
+  margin-top: 38rpx;
+  padding: 24rpx;
+  border-radius: 8px;
+  font-size: 29rpx;
+  font-weight: 650;
+  text-align: center;
+  color: #ffffff;
+  background: #d96b5b;
+}
