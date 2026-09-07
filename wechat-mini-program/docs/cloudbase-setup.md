@@ -6,7 +6,7 @@
 
 1. 在微信公众平台注册小程序并取得真实 AppID。
 2. 打开微信开发者工具，选择“导入项目”，目录选择本项目的 `wechat-mini-program` 文件夹。
-3. 把导入界面中的测试 AppID `touristappid` 换成你自己的 AppID。
+3. 确认导入界面中的 AppID 与微信公众平台里的小程序 AppID 一致。
 4. 导入后点击顶部“云开发”，开通一个云开发环境，并记下环境名称。
 
 `project.private.config.json` 是本机配置，已被 Git 忽略，不需要上传 GitHub。
